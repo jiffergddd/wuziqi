@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f4ede0">
+<title>群五子棋 · 同房对战</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; background:#f4ede0; color:#3a2f28; min-height:100vh; padding:16px 12px calc(24px + env(safe-area-inset-bottom)); }
+  .app { max-width:560px; margin:0 auto; }
+  header { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; }
+  h1 { font-size:22px; letter-spacing:2px; }
+  h1 .sub { font-size:12px; color:#a0622d; background:#f7e3c2; padding:2px 8px; border-radius:10px; vertical-align:middle; margin-left:6px; }
+  #netBadge { font-size:12px; padding:3px 10px; border-radius:10px; background:#eee2cc; color:#8c7a5e; }
+  #netBadge.ok { background:#d9efdd; color:#2e7d43; }
+  #netBadge.warn { background:#f7e8c8; color:#a06b00; }
+  #netBadge.bad { background:#f5d7d3; color:#b3402e; }
+  #statusBar { display:flex; align-items:center; justify-content:center; gap:8px; background:#fffdf8; border:1px solid #e3d4bc; border-radius:12px; padding:9px 12px; margin-top:10px; font-size:14px; flex-wrap:wrap; }
+  .dot { width:14px; height:14px; border-radius:50%; display:inline-block; border:1px solid rgba(0,0,0,.2); flex:none; }
+  .dot.black { background:radial-gradient(circle at 35% 30%, #666, #111); }
+  .dot.white { background:radial-gradient(circle at 35% 30%, #fff, #cfc9bd); }
+  #myTeamChip { font-size:12px; padding:2px 10px; border-radius:10px; background:#8c7a5e; color:#fff; }
+  #myTeamChip.black { background:#222; }
+  #myTeamChip.white { background:#e8e2d5; color:#444; }
+  #moveInfo { color:#8c7a5e; font-size:12px; width:100%; text-align:center; }
+  .board-wrap { margin:12px 0; display:flex; justify-content:center; }
+  canvas { touch-action:none; border-radius:8px; box-shadow:0 4px 16px rgba(90,60,20,.18); cursor:pointer; }
+  .actions { display:flex; gap:8px; margin-bottom:12px; }
+  button { font-size:14px; border-radius:10px; padding:10px 6px; flex:1; border:1px solid #d8c5a5; background:#fffdf8; color:#5a4a34; cursor:pointer; font-family:inherit; }
+  button:active { transform:scale(.97); background:#f2e8d8; }
+  .panel { background:#fffdf8; border:1.5px solid #e3d4bc; border-radius:14px; padding:12px; margin-bottom:12px; }
+  .panel h2 { font-size:13px; color:#8c7a5e; margin-bottom:8px; font-weight:600; }
+  .team-row { display:flex; gap:8px; font-size:13px; padding:5px 0; align-items:baseline; }
+  .team-row .t { flex:none; width:62px; font-weight:600; }
+  .team-row .names { color:#5a4a34; line-height:1.7; word-break:break-all; }
+  .team-row .empty { color:#b3a488; }
+  #log { max-height:128px; overflow-y:auto; font-size:12px; color:#7a6a50; line-height:1.9; }
+  #log div { border-bottom:1px dashed #efe6d3; }
+  .help { margin-top:14px; font-size:13px; color:#7a6a50; line-height:1.8; }
+  .help summary { cursor:pointer; font-weight:600; color:#5a4a34; }
+  .help ol { padding-left:20px; margin-top:6px; }
+  footer { text-align:center; font-size:11px; color:#b3a488; margin-top:16px; }
+  #entry { position:fixed; inset:0; background:rgba(40,30,20,.5); display:flex; align-items:center; justify-content:center; padding:20px; z-index:30; }
+  #entry.hidden { display:none; }
+  .entry-card { background:#fffdf8; border-radius:16px; padding:20px; width:100%; max-width:380px; }
+  .entry-card h3 { font-size:18px; margin-bottom:4px; text-align:center; }
+  .entry-card .tip { font-size:12px; color:#8c7a5e; text-align:center; margin-bottom:14px; }
+  #nameInput { width:100%; font-size:16px; padding:10px 12px; border:1.5px solid #d8c5a5; border-radius:10px; background:#faf5ea; margin-bottom:12px; font-family:inherit; }
+  #nameInput:focus { outline:none; border-color:#a0622d; }
+  .side-btn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; margin-bottom:8px; padding:12px; font-size:15px; flex:none; }
+  .sdot { width:16px; height:16px; border-radius:50%; border:1px solid rgba(0,0,0,.25); flex:none; }
+  #toast { position:fixed; left:50%; bottom:calc(30px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(20px); background:rgba(43,39,36,.92); color:#fff; font-size:14px; padding:10px 18px; border-radius:22px; opacity:0; transition:.25s; pointer-events:none; z-index:40; max-width:86vw; text-align:center; }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>群五子棋 <span class="sub">同房对战</span></h1>
+    <span id="netBadge" class="warn">加载中…</span>
+  </header>
+
+  <div id="statusBar">
+    <span id="turnDot" class="dot black"></span>
+    <span id="turnText">轮到黑方</span>
+    <span id="myTeamChip">未加入</span>
+    <span id="moveInfo">第 1 手 · 黑方先行</span>
+  </div>
+
+  <div class="board-wrap"><canvas id="board"></canvas></div>
+
+  <div class="actions">
+    <button id="btnUndo">↩ 悔棋</button>
+    <button id="btnNew">🔄 新局</button>
+    <button id="btnProfile">👤 名字/阵营</button>
+  </div>
+
+  <section class="panel">
+    <h2>在场群友</h2>
+    <div class="team-row"><span class="t">⚫ 黑方</span><span class="names" id="rosterBlack"></span></div>
+    <div class="team-row"><span class="t">⚪ 白方</span><span class="names" id="rosterWhite"></span></div>
+    <div class="team-row"><span class="t">👀 观战</span><span class="names" id="rosterWatch"></span></div>
+  </section>
+
+  <section class="panel">
+    <h2>房间动态</h2>
+    <div id="log"></div>
+  </section>
+
+  <details class="help">
+    <summary>📖 玩法说明</summary>
+    <ol>
+      <li><b>进房间</b>：所有人点群里的同一个链接，输入名字后选黑方或白方即可入场。</li>
+      <li><b>团队接力</b>：同一方可以有任意多人，谁在线谁来落子；一方落完子，自动轮到另一方。</li>
+      <li><b>落子</b>：点交叉点选中（出现预览子），<b>再点一次同一位置</b>确认。</li>
+      <li><b>悔棋</b>：由刚落子那一方的成员发起，撤回该方最后一手。</li>
+      <li><b>房主</b>：第一个进房的人自动成为房主；房主关掉页面后，其他人会自动接管房间并恢复棋局。</li>
+      <li><b>连不上？</b>：点 QQ 右上角「…」→ 用系统浏览器打开链接再试。</li>
+    </ol>
+  </details>
+
+  <footer>纯前端 · WebRTC P2P · 棋局数据不经服务器存储</footer>
+</div>
+
+<div id="entry" class="hidden">
+  <div class="entry-card">
+    <h3 id="entryTitle">加入房间</h3>
+    <p class="tip">输入昵称，选择你要加入的一方</p>
+    <input id="nameInput" maxlength="10" placeholder="你的名字（群里怎么叫你就填啥）">
+    <button class="side-btn" id="pickBlack"><span class="sdot" style="background:radial-gradient(circle at 35% 30%,#666,#111)"></span>加入黑方（先手）</button>
+    <button class="side-btn" id="pickWhite"><span class="sdot" style="background:radial-gradient(circle at 35% 30%,#fff,#cfc9bd)"></span>加入白方（后手）</button>
+    <button class="side-btn" id="pickWatch">👀 先观战（之后可换）</button>
+    <button id="entryCancel" style="display:none">取消</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ★ 改动点 1：用国内可达的多 CDN 依次尝试加载 PeerJS，任一成功即停 -->
+<script>
+(function loadPeer(fallbacks) {
+  if (!fallbacks.length) return; // 全部失败，由页面兜底提示
+  var s = document.createElement('script');
+  s.src = fallbacks[0];
+  s.onload = function () { if (!window.Peer) loadPeer(fallbacks.slice(1)); };
+  s.onerror = function () { loadPeer(fallbacks.slice(1)); };
+  document.head.appendChild(s);
+})([
+  'https://fastly.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js',
+  'https://gcore.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js',
+  'https://jsd.cdn.zzko.cn/npm/peerjs@1.5.4/dist/peerjs.min.js',
+  'https://cdn.jsdelivr.us/npm/peerjs@1.5.4/dist/peerjs.min.js',
+  'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'
+]);
+</script>
+
+<script>
+(function () {
+'use strict';
+const N = 15;
+const COLS = 'ABCDEFGHIJKLMNO';
+const ROOM_ID = 'wzq-room-qun-a7f3k9';   // ★ 记得改成自己的随机串，避免和别的群撞房间
+const LS_PROFILE = 'wzq_room_profile_v1';
+const LS_STATE   = 'wzq_room_state_v1';
+
+/* ★ 改动点 2：新增 ICE 配置。多路 STUN 提高打洞成功率，Open Relay 免费 TURN 兜底穿透对称 NAT */
+const PEER_OPTS = {
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.cloudflare.com:3478' },
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'turn:openrelay.metered.ca:80',  username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+    ],
+    iceCandidatePoolSize: 4
+  }
+};
+
+const state = { moves: [], log: [], winner: 0, winLine: null, pending: null };
+let board = [];
+let roster = [];
+let profile = null;
+let netStarted = false;
+let lastHostMsg = 0;
+
+const net = { peer: null, role: null, hostConn: null, conns: new Map(), claiming: false, claimTimer: null, hintShown: false };
+
+const $ = id => document.getElementById(id);
+const canvas = $('board');
+const ctx = canvas.getContext('2d');
+let cssSize = 0, cell = 0, margin = 0, dpr = 1;
+
+/* ---------- 规则 ---------- */
+const currentColor = () => state.moves.length % 2 === 0 ? 1 : 2;
+const posToXY = p => [p % N, Math.floor(p / N)];
+const posName = p => { const [x, y] = posToXY(p); return COLS[x] + (N - y); };
+const teamName = t => t === 1 ? '黑方' : t === 2 ? '白方' : '观战';
+const colorName = c => c === 1 ? '黑' : '白';
+const connOpen = c => !!(c && c.open);
+
+function rebuild() {
+  board = Array.from({ length: N }, () => new Array(N).fill(0));
+  state.moves.forEach((p, i) => { const [x, y] = posToXY(p); board[y][x] = i % 2 === 0 ? 1 : 2; });
+}
+function checkWin(x, y) {
+  const c = board[y][x];
+  for (const [dx, dy] of [[1,0],[0,1],[1,1],[1,-1]]) {
+    const line = [[x, y]];
+    for (const s of [1, -1]) {
+      let nx = x + dx * s, ny = y + dy * s;
+      while (nx >= 0 && nx < N && ny >= 0 && ny < N && board[ny][nx] === c) { line.push([nx, ny]); nx += dx * s; ny += dy * s; }
+    }
+    if (line.length >= 5) return line;
+  }
+  return null;
+}
+function recomputeWinner() {
+  state.winner = 0; state.winLine = null;
+  if (state.moves.length) {
+    const [x, y] = posToXY(state.moves[state.moves.length - 1]);
+    const line = checkWin(x, y);
+    if (line) { state.winner = board[y][x]; state.winLine = line; }
+  }
+}
+function sanitizeMoves(m) {
+  if (!Array.isArray(m) || m.length > 225) return null;
+  const seen = new Set();
+  for (const p of m) {
+    if (!Number.isInteger(p) || p < 0 || p > 224 || seen.has(p)) return null;
+    seen.add(p);
+  }
+  return m;
+}
+function sanitizeName(s) { return String(s == null ? '' : s).trim().replace(/\s+/g, ' ').slice(0, 10); }
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function addLog(text) {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0'), mm = String(now.getMinutes()).padStart(2, '0');
+  state.log.push(hh + ':' + mm + ' ' + text);
+  if (state.log.length > 80) state.log = state.log.slice(-80);
+}
+
+/* ---------- 本地持久化 ---------- */
+function saveRoom() {
+  try { localStorage.setItem(LS_STATE, JSON.stringify({ moves: state.moves, log: state.log, ts: Date.now() })); } catch (e) {}
+}
+function loadSavedState() {
+  try { const d = JSON.parse(localStorage.getItem(LS_STATE) || 'null'); if (d && typeof d === 'object') return d; } catch (e) {}
+  return null;
+}
+function loadProfile() {
+  try {
+    const p = JSON.parse(localStorage.getItem(LS_PROFILE) || 'null');
+    if (p && typeof p.name === 'string' && [0, 1, 2].includes(p.team)) return { name: p.name.slice(0, 10), team: p.team };
+  } catch (e) {}
+  return null;
+}
+
+/* ---------- 渲染 ---------- */
+function resizeCanvas() {
+  const size = Math.min(canvas.parentElement.clientWidth, 560);
+  if (size <= 0) return;
+  dpr = window.devicePixelRatio || 1;
+  cssSize = size;
+  canvas.width = Math.round(size * dpr);
+  canvas.height = Math.round(size * dpr);
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+  cell = size / (N + 1);
+  margin = cell;
+  draw();
+}
+function drawStone(x, y, color, alpha) {
+  const cx = margin + x * cell, cy = margin + y * cell, r = cell * 0.43;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.shadowColor = 'rgba(60,40,10,.35)';
+  ctx.shadowBlur = cell * 0.08;
+  ctx.shadowOffsetY = cell * 0.04;
+  const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r * 1.05);
+  if (color === 1) { g.addColorStop(0, '#585858'); g.addColorStop(1, '#0d0d0d'); }
+  else { g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#c8c2b6'); }
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const bg = ctx.createLinearGradient(0, 0, cssSize, cssSize);
+  bg.addColorStop(0, '#e8c489'); bg.addColorStop(1, '#d9ad63');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, cssSize, cssSize);
+  ctx.strokeStyle = '#7a5526'; ctx.lineWidth = 1;
+  for (let i = 0; i < N; i++) {
+    const p = margin + i * cell;
+    ctx.beginPath(); ctx.moveTo(margin, p); ctx.lineTo(margin + (N - 1) * cell, p); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p, margin); ctx.lineTo(p, margin + (N - 1) * cell); ctx.stroke();
+  }
+  ctx.lineWidth = 2;
+  ctx.strokeRect(margin, margin, (N - 1) * cell, (N - 1) * cell);
+  ctx.fillStyle = '#7a5526';
+  for (const [sx, sy] of [[3,3],[11,3],[3,11],[11,11],[7,7]]) {
+    ctx.beginPath(); ctx.arc(margin + sx * cell, margin + sy * cell, cell * 0.11, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(122,85,38,.75)';
+  ctx.font = Math.max(9, cell * 0.3) + 'px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let i = 0; i < N; i++) {
+    ctx.fillText(COLS[i], margin + i * cell, margin + (N - 1) * cell + cell * 0.5);
+    ctx.fillText(String(N - i), margin - cell * 0.5, margin + i * cell);
+  }
+  for (let i = 0; i < state.moves.length; i++) {
+    const [x, y] = posToXY(state.moves[i]);
+    drawStone(x, y, i % 2 === 0 ? 1 : 2, 1);
+    if (i === state.moves.length - 1 && !state.winLine) {
+      ctx.fillStyle = '#e0402f';
+      ctx.beginPath(); ctx.arc(margin + x * cell, margin + y * cell, cell * 0.13, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  if (state.winLine) {
+    ctx.strokeStyle = '#e0402f'; ctx.lineWidth = 3;
+    for (const [wx, wy] of state.winLine) {
+      ctx.beginPath(); ctx.arc(margin + wx * cell, margin + wy * cell, cell * 0.47, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+  if (state.pending && !state.winner) {
+    drawStone(state.pending.x, state.pending.y, currentColor(), 0.45);
+    ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = currentColor() === 1 ? '#fff' : '#333';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(margin + state.pending.x * cell, margin + state.pending.y * cell, cell * 0.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+/* ---------- UI ---------- */
+let toastTimer = null;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+function myKey() { return net.role === 'host' ? 'self' : (net.peer ? net.peer.id : null); }
+function netReady() { return net.role === 'host' || connOpen(net.hostConn); }
+
+function updateNetUI() {
+  const b = $('netBadge');
+  if (!window.Peer) { b.className = 'bad'; b.textContent = '组件加载失败'; return; }
+  if (net.role === 'host') { b.className = 'ok'; b.textContent = '🟢 房主（你）'; }
+  else if (connOpen(net.hostConn)) { b.className = 'ok'; b.textContent = '🟢 已连接'; }
+  else { b.className = 'warn'; b.textContent = '🟡 连接中…'; }
+}
+function setStatus() {
+  const chip = $('myTeamChip');
+  if (!profile) { chip.className = ''; chip.textContent = '未加入'; }
+  else { chip.className = profile.team === 1 ? 'black' : profile.team === 2 ? 'white' : ''; chip.textContent = '我 · ' + teamName(profile.team); }
+  if (state.winner) {
+    $('turnDot').className = 'dot ' + (state.winner === 1 ? 'black' : 'white');
+    $('turnText').textContent = teamName(state.winner) + '获胜！🏆';
+    $('moveInfo').textContent = '共 ' + state.moves.length + ' 手 · 点「新局」再开';
+    return;
+  }
+  const c = currentColor();
+  $('turnDot').className = 'dot ' + (c === 1 ? 'black' : 'white');
+  $('turnText').textContent = '轮到' + teamName(c);
+  let info = '第 ' + (state.moves.length + 1) + ' 手';
+  if (!window.Peer) info += ' · 组件加载中…';
+  else if (!netReady()) info += ' · 连接房间中…';
+  else if (!profile || profile.team === 0) info += ' · 观战中';
+  else if (profile.team === c) info += ' · 该你方落子' + (state.pending ? '，再点一次确认 ' + posName(state.pending.y * N + state.pending.x) : '');
+  else info += ' · 等待' + teamName(c) + '落子';
+  if (state.moves.length && !state.pending) {
+    const last = state.moves[state.moves.length - 1];
+    info += ' · 上一手 ' + posName(last) + '（' + colorName(state.moves.length % 2 === 1 ? 1 : 2) + '）';
+  }
+  info += ' · 在线 ' + roster.length + ' 人';
+  $('moveInfo').textContent = info;
+}
+function renderRoster() {
+  const mine = myKey();
+  const html = team => {
+    const arr = roster.filter(r => r.team === team);
+    if (!arr.length) return '<span class="empty">' + (team === 0 ? '—' : '虚位以待') + '</span>';
+    return arr.map(r => escapeHtml(r.name) + (r.key === mine ? '（我）' : '')).join('、');
+  };
+  $('rosterBlack').innerHTML = html(1);
+  $('rosterWhite').innerHTML = html(2);
+  $('rosterWatch').innerHTML = html(0);
+}
+function renderLog() {
+  const el = $('log');
+  el.innerHTML = state.log.map(s => '<div>' + escapeHtml(s) + '</div>').join('') || '<div style="color:#b3a488">暂无动态</div>';
+  el.scrollTop = el.scrollHeight;
+}
+let lastRosterJson = '', lastLogJson = '';
+function updateAll() {
+  draw();
+  updateNetUI();
+  setStatus();
+  const rj = JSON.stringify(roster), lj = JSON.stringify(state.log);
+  if (rj !== lastRosterJson) { lastRosterJson = rj; renderRoster(); }
+  if (lj !== lastLogJson) { lastLogJson = lj; renderLog(); }
+}
+
+/* ---------- 网络 ---------- */
+function ensureNet() {
+  if (netStarted) return;
+  if (!window.Peer) return;   // ★ 改动点 5：脚本还没就位时不锁定，等 waitPeer 轮询到再进来
+  netStarted = true;
+
+  tryClaimHost(becomeGuest);
+
+  setInterval(() => {
+    if (net.role === 'guest') {
+      if (net.peer && net.peer.destroyed) { net.peer = null; becomeGuest(); return; }
+      if (net.peer && net.peer.open && !net.claiming && !connOpen(net.hostConn)) connectToHost();
+    }
+  }, 4000);
+  setInterval(() => { if (net.role === 'host') broadcastState(); }, 8000);
+  setInterval(() => {
+    if (net.role === 'guest' && connOpen(net.hostConn) && Date.now() - lastHostMsg > 25000) {
+      try { net.hostConn.close(); } catch (e) {}
+      net.hostConn = null;
+      updateNetUI(); setStatus(); scheduleClaim();
+    }
+  }, 5000);
+  setTimeout(() => {
+    if (!net.hintShown && net.role === 'guest' && !connOpen(net.hostConn)) {
+      net.hintShown = true;
+      toast('一直连不上？点 QQ 右上角菜单 →「在浏览器中打开」再试');
+    }
+  }, 15000);
+}
+
+/* ★ 改动点 5：轮询等 window.Peer 就绪后再启动网络；10 秒仍没就绪才提示"组件加载失败" */
+function waitPeer(attempt) {
+  if (window.Peer) {
+    updateNetUI();
+    if (profile) ensureNet();
+    return;
+  }
+  if (attempt > 20) {   // 20 × 500ms = 10 秒
+    const b = $('netBadge');
+    b.className = 'bad';
+    b.textContent = '组件加载失败';
+    toast('网络组件加载失败，建议切换网络或用系统浏览器打开');
+    return;
+  }
+  setTimeout(() => waitPeer(attempt + 1), 500);
+}
+
+function tryClaimHost(onFail) {
+  if (!window.Peer || net.role === 'host') { if (onFail) onFail(); return; }
+  if (net.claiming) { if (onFail) onFail(); return; }
+  net.claiming = true;
+  let settled = false;
+  const p = new Peer(ROOM_ID, PEER_OPTS);   // ★ 改动点 3：房主接上 ICE 配置
+  const finish = ok => {
+    if (settled) return;
+    settled = true;
+    net.claiming = false;
+    if (ok) becomeHost(p);
+    else { try { p.destroy(); } catch (e) {} if (onFail) onFail(); }
+  };
+  p.on('open', () => finish(true));
+  p.on('error', () => finish(false));
+}
+
+function scheduleClaim() {
+  if (net.claiming || net.role === 'host' || net.claimTimer) return;
+  net.claimTimer = setTimeout(() => {
+    net.claimTimer = null;
+    if (net.role === 'guest' && !connOpen(net.hostConn)) tryClaimHost(null);
+  }, 1200 + Math.random() * 2300);
+}
+
+function becomeHost(p) {
+  if (net.peer && net.peer !== p) { try { net.peer.destroy(); } catch (e) {} }
+  net.peer = p;
+  net.role = 'host';
+  net.hostConn = null;
+  net.conns.clear();
+  const saved = loadSavedState();
+  const moves = saved ? sanitizeMoves(saved.moves) : null;
+  const migration = !!(moves && moves.length);
+  state.moves = moves ? moves.slice() : [];
+  state.log = (saved && Array.isArray(saved.log) ? saved.log.slice() : []).slice(-80);
+  state.pending = null;
+  rebuild(); recomputeWinner();
+  profile = profile || { name: '群友', team: 0 };
+  roster = [{ key: 'self', name: profile.name, team: profile.team }];
+  if (migration) addLog('房主掉线，「' + profile.name + '」接管房间，棋局已恢复');
+  else addLog('房间已创建，把链接发到群里吧');
+  p.on('connection', wireGuest);
+  p.on('disconnected', () => { try { p.reconnect(); } catch (e) {} });
+  p.on('error', err => {
+    if (err && err.type === 'unavailable-id') {
+      try { p.destroy(); } catch (e) {}
+      net.peer = null; becomeGuest();
+    }
+  });
+  saveRoom(); updateAll();
+}
+
+function becomeGuest() {
+  net.role = 'guest';
+  net.hostConn = null;
+  if (net.peer) { try { net.peer.destroy(); } catch (e) {} net.peer = null; }
+  const p = new Peer(PEER_OPTS);   // ★ 改动点 4：房客接上 ICE 配置
+  net.peer = p;
+  p.on('open', () => connectToHost());
+  p.on('disconnected', () => { try { p.reconnect(); } catch (e) {} });
+  p.on('error', err => {
+    if (err && err.type === 'peer-unavailable') {
+      net.hostConn = null;
+      updateNetUI(); setStatus(); scheduleClaim();
+    }
+  });
+  updateNetUI(); setStatus();
+}
+
+function connectToHost() {
+  if (net.role !== 'guest' || !net.peer || !net.peer.open) return;
+  if (connOpen(net.hostConn)) return;
+  const conn = net.peer.connect(ROOM_ID, { reliable: true });
+  net.hostConn = conn;
+  conn.on('open', () => {
+    lastHostMsg = Date.now();
+    conn.send({ t: 'join', name: profile.name, team: profile.team });
+    updateNetUI(); setStatus();
+    toast('已连接房间');
+  });
+  conn.on('data', handleHostData);
+  const onLost = () => {
+    if (net.hostConn === conn) {
+      net.hostConn = null;
+      updateNetUI(); setStatus(); scheduleClaim();
+    }
+  };
+  conn.on('close', onLost);
+  conn.on('error', onLost);
+}
+
+function wireGuest(conn) {
+  const onGone = () => {
+    if (net.conns.get(conn.peer) !== conn) return;
+    net.conns.delete(conn.peer);
+    const r = roster.find(r => r.key === conn.peer);
+    roster = roster.filter(r => r.key !== conn.peer);
+    if (r) addLog('「' + r.name + '」离开');
+    broadcastState();
+  };
+  conn.on('open', () => {
+    const old = net.conns.get(conn.peer);
+    if (old && old !== conn) { try { old.close(); } catch (e) {} }
+    net.conns.set(conn.peer, conn);
+  });
+  conn.on('data', d => handleGuestMsg(conn, d));
+  conn.on('close', onGone);
+  conn.on('error', onGone);
+}
+
+function handleGuestMsg(conn, d) {
+  if (!d || typeof d !== 'object' || net.role !== 'host') return;
+  switch (d.t) {
+    case 'join':
+    case 'profile': {
+      const name = sanitizeName(d.name) || '无名群友';
+      const team = [0, 1, 2].includes(d.team) ? d.team : 0;
+      net.conns.set(conn.peer, conn);
+      const isNew = !roster.some(r => r.key === conn.peer);
+      upsertRoster(conn.peer, name, team);
+      addLog('「' + name + '」' + (d.t === 'join' ? '加入' : '切换到') + teamName(team));
+      broadcastState();
+      break;
+    }
+    case 'move':
+      if (Number.isInteger(d.pos)) hostApplyMove(conn.peer, d.pos);
+      break;
+    case 'undo':  hostApplyUndo(conn.peer); break;
+    case 'reset': hostApplyReset(conn.peer); break;
+  }
+}
+function upsertRoster(key, name, team) {
+  const r = roster.find(r => r.key === key);
+  if (r) { r.name = name; r.team = team; }
+  else roster.push({ key, name, team });
+}
+
+function hostApplyMove(key, pos) {
+  if (state.winner || !Number.isInteger(pos) || pos < 0 || pos > 224) { broadcastState(); return; }
+  const r = roster.find(r => r.key === key);
+  if (!r || r.team === 0 || r.team !== currentColor()) { broadcastState(); return; }
+  const [x, y] = posToXY(pos);
+  if (board[y][x] !== 0) { broadcastState(); return; }
+  state.moves.push(pos);
+  state.pending = null;
+  rebuild(); recomputeWinner();
+  addLog('「' + r.name + '」落子 ' + posName(pos) + '（' + colorName(r.team) + '）');
+  if (state.winner) addLog(teamName(state.winner) + '五连获胜！本局共 ' + state.moves.length + ' 手 🏆');
+  broadcastState();
+}
+function hostApplyUndo(key) {
+  if (!state.moves.length) return;
+  const lastTeam = state.moves.length % 2 === 1 ? 1 : 2;
+  const r = roster.find(r => r.key === key);
+  if (!r || r.team !== lastTeam) { broadcastState(); return; }
+  const p = state.moves.pop();
+  state.pending = null;
+  rebuild(); recomputeWinner();
+  addLog('「' + r.name + '」悔棋，撤回 ' + posName(p));
+  broadcastState();
+}
+function hostApplyReset(key) {
+  const r = roster.find(r => r.key === key);
+  state.moves = []; state.pending = null;
+  rebuild(); state.winner = 0; state.winLine = null;
+  addLog('「' + (r ? r.name : '?') + '」发起新局，黑方先行');
+  broadcastState();
+}
+function broadcastState() {
+  const msg = { t: 'state', moves: state.moves.slice(), roster, log: state.log.slice() };
+  net.conns.forEach(c => { if (c.open) { try { c.send(msg); } catch (e) {} } });
+  saveRoom(); updateAll();
+}
+
+function handleHostData(d) {
+  if (!d || typeof d !== 'object' || d.t !== 'state') return;
+  lastHostMsg = Date.now();
+  const moves = sanitizeMoves(d.moves);
+  if (!moves) return;
+  state.moves = moves;
+  if (Array.isArray(d.roster)) {
+    roster = d.roster
+      .filter(r => r && typeof r.name === 'string')
+      .map(r => ({ key: r.key, name: String(r.name).slice(0, 10), team: [0, 1, 2].includes(r.team) ? r.team : 0 }));
+  }
+  if (Array.isArray(d.log)) state.log = d.log.slice(-80);
+  rebuild(); recomputeWinner();
+  if (state.pending) {
+    const { x, y } = state.pending;
+    if (state.winner || board[y][x] !== 0 || !profile || profile.team !== currentColor()) state.pending = null;
+  }
+  saveRoom(); updateAll();
+}
+
+/* ---------- 交互 ---------- */
+canvas.addEventListener('pointerdown', function (e) {
+  e.preventDefault();
+  if (!profile) { showEntry(false); return; }
+  if (state.winner) { toast('本局已结束，点「新局」再开一盘'); return; }
+  if (!window.Peer) { toast('组件还在加载，稍等几秒…'); return; }
+  if (!netReady()) { toast('还没连上房间，稍等几秒…'); return; }
+  if (profile.team === 0) { toast('观战中，点「名字/阵营」可加入一方'); return; }
+  if (profile.team !== currentColor()) { toast('现在轮到' + teamName(currentColor()) + '落子'); return; }
+  const rect = canvas.getBoundingClientRect();
+  const px = e.clientX - rect.left, py = e.clientY - rect.top;
+  const gx = Math.round((px - margin) / cell), gy = Math.round((py - margin) / cell);
+  if (gx < 0 || gx >= N || gy < 0 || gy >= N) return;
+  if (Math.hypot(px - (margin + gx * cell), py - (margin + gy * cell)) > cell * 0.48) return;
+  if (board[gy][gx] !== 0) {
+    if (state.pending) { state.pending = null; draw(); setStatus(); }
+    return;
+  }
+  if (state.pending && state.pending.x === gx && state.pending.y === gy) {
+    doPlace(gx, gy);
+  } else {
+    state.pending = { x: gx, y: gy };
+    draw(); setStatus();
+  }
+});
+
+function doPlace(x, y) {
+  const pos = y * N + x;
+  if (net.role === 'host') { hostApplyMove('self', pos); return; }
+  if (!connOpen(net.hostConn)) { toast('还没连上房间'); return; }
+  state.moves.push(pos);
+  state.pending = null;
+  rebuild(); recomputeWinner();
+  draw(); setStatus();
+  try { net.hostConn.send({ t: 'move', pos }); } catch (e) {}
+}
+
+$('btnUndo').addEventListener('click', function () {
+  if (!state.moves.length) { toast('还没有落子'); return; }
+  if (!profile || profile.team === 0) { toast('观战不能悔棋'); return; }
+  const lastTeam = state.moves.length % 2 === 1 ? 1 : 2;
+  if (profile.team !== lastTeam) { toast('这手是' + teamName(lastTeam) + '下的，由他们发起悔棋'); return; }
+  const p = state.moves[state.moves.length - 1];
+  if (!confirm('撤回最后一手（' + posName(p) + '）？')) return;
+  if (net.role === 'host') hostApplyUndo('self');
+  else if (connOpen(net.hostConn)) net.hostConn.send({ t: 'undo' });
+  else toast('还没连上房间');
+});
+
+$('btnNew').addEventListener('click', function () {
+  if (!confirm('发起新的一局？棋盘清空，黑方先行。')) return;
+  if (net.role === 'host') hostApplyReset('self');
+  else if (connOpen(net.hostConn)) net.hostConn.send({ t: 'reset' });
+  else toast('还没连上房间');
+});
+
+$('btnProfile').addEventListener('click', () => showEntry(true));
+
+/* ---------- 入场 ---------- */
+function showEntry(edit) {
+  $('entryTitle').textContent = edit ? '修改名字 / 阵营' : '加入房间';
+  $('nameInput').value = profile ? profile.name : '';
+  $('entryCancel').style.display = edit ? '' : 'none';
+  $('entry').classList.remove('hidden');
+  setTimeout(() => $('nameInput').focus(), 50);
+}
+function submitEntry(team) {
+  const name = sanitizeName($('nameInput').value);
+  if (!name) { toast('先输入名字'); $('nameInput').focus(); return; }
+  const isNew = !profile;
+  profile = { name, team };
+  try { localStorage.setItem(LS_PROFILE, JSON.stringify(profile)); } catch (e) {}
+  $('entry').classList.add('hidden');
+  if (net.role === 'host') {
+    upsertRoster('self', name, team);
+    addLog('「' + name + '」' + (isNew ? '加入' : '切换到') + teamName(team));
+    broadcastState();
+  } else if (connOpen(net.hostConn)) {
+    net.hostConn.send({ t: 'profile', name, team });
+  }
+  ensureNet();
+  updateAll();
+}
+$('pickBlack').addEventListener('click', () => submitEntry(1));
+$('pickWhite').addEventListener('click', () => submitEntry(2));
+$('pickWatch').addEventListener('click', () => submitEntry(0));
+$('entryCancel').addEventListener('click', () => $('entry').classList.add('hidden'));
+
+/* ---------- 启动 ---------- */
+window.addEventListener('resize', resizeCanvas);
+(function init() {
+  resizeCanvas();
+  profile = loadProfile();
+  const saved = loadSavedState();
+  const mv = saved ? sanitizeMoves(saved.moves) : null;
+  if (mv) {
+    state.moves = mv;
+    state.log = Array.isArray(saved.log) ? saved.log.slice(-80) : [];
+    rebuild(); recomputeWinner();
+  }
+  // ★ 改动点 5：不再直接判断 window.Peer，改为轮询等待
+  if (profile) showEntryViewOnly();
+  else showEntry(false);
+  waitPeer(0);
+  updateAll();
+})();
+
+/* 已有 profile 时不弹入场窗，静等 waitPeer 自动连房 */
+function showEntryViewOnly() { /* no-op，仅做语义占位 */ }
+})();
+</script>
+</body>
+</html>
