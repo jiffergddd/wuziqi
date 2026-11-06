@@ -95,12 +95,12 @@
       <li><b>团队接力</b>：同一方可以有任意多人，谁在线谁来落子；一方落完子，自动轮到另一方。</li>
       <li><b>落子</b>：点交叉点选中（出现预览子），<b>再点一次同一位置</b>确认。</li>
       <li><b>悔棋</b>：由刚落子那一方的成员发起，撤回该方最后一手。</li>
-      <li><b>房主</b>：第一个进房的人自动成为房主；房主关掉页面后，其他人会自动接管房间并恢复棋局。</li>
+      <li><b>自动房主</b>：系统自动在在线玩家中推选一名房主；房主掉线会自动换人接管，棋局留存在云端，随时接着下。</li>
       <li><b>连不上？</b>：点 QQ 右上角「…」→ 用系统浏览器打开链接再试。</li>
     </ol>
   </details>
 
-  <footer>纯前端 · WebRTC P2P · 棋局数据不经服务器存储</footer>
+  <footer>免费公共服务器中转（MQTT）· 无需自建后端 · 棋局云端留存</footer>
 </div>
 
 <div id="entry" class="hidden">
@@ -117,21 +117,21 @@
 
 <div id="toast"></div>
 
-<!-- ★ 改动点 1：用国内可达的多 CDN 依次尝试加载 PeerJS，任一成功即停 -->
+<!-- 依次尝试多 CDN 加载 MQTT 客户端，任一成功即停 -->
 <script>
-(function loadPeer(fallbacks) {
-  if (!fallbacks.length) return; // 全部失败，由页面兜底提示
+(function loadMqtt(fallbacks) {
+  if (!fallbacks.length) return;
   var s = document.createElement('script');
   s.src = fallbacks[0];
-  s.onload = function () { if (!window.Peer) loadPeer(fallbacks.slice(1)); };
-  s.onerror = function () { loadPeer(fallbacks.slice(1)); };
+  s.onload = function () { if (!window.mqtt) loadMqtt(fallbacks.slice(1)); };
+  s.onerror = function () { loadMqtt(fallbacks.slice(1)); };
   document.head.appendChild(s);
 })([
-  'https://fastly.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js',
-  'https://gcore.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js',
-  'https://jsd.cdn.zzko.cn/npm/peerjs@1.5.4/dist/peerjs.min.js',
-  'https://cdn.jsdelivr.us/npm/peerjs@1.5.4/dist/peerjs.min.js',
-  'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'
+  'https://fastly.jsdelivr.net/npm/mqtt@4.3.7/dist/mqtt.min.js',
+  'https://gcore.jsdelivr.net/npm/mqtt@4.3.7/dist/mqtt.min.js',
+  'https://jsd.cdn.zzko.cn/npm/mqtt@4.3.7/dist/mqtt.min.js',
+  'https://cdn.jsdelivr.us/npm/mqtt@4.3.7/dist/mqtt.min.js',
+  'https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js'
 ]);
 </script>
 
@@ -140,32 +140,26 @@
 'use strict';
 const N = 15;
 const COLS = 'ABCDEFGHIJKLMNO';
-const ROOM_ID = 'wzq-room-qun-a7f3k9';   // ★ 记得改成自己的随机串，避免和别的群撞房间
+const ROOM_KEY = 'wzq-r2-m8qk3x';   // 房间频道名，记得改成自己的随机串，避免和别的群撞房间
 const LS_PROFILE = 'wzq_room_profile_v1';
 const LS_STATE   = 'wzq_room_state_v1';
 
-/* ★ 改动点 2：新增 ICE 配置。多路 STUN 提高打洞成功率，Open Relay 免费 TURN 兜底穿透对称 NAT */
-const PEER_OPTS = {
-  config: {
-    iceServers: [
-      { urls: 'stun:stun.cloudflare.com:3478' },
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'turn:openrelay.metered.ca:80',  username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-      { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
-    ],
-    iceCandidatePoolSize: 4
-  }
-};
+/* 免费 MQTT 中转服务器（无需注册），依次尝试；以后自建服务器只需换这里的地址 */
+const BROKERS = [
+  'wss://broker.emqx.io:8084/mqtt',
+  'wss://broker.hivemq.com:8884/mqtt'
+];
+const T_STATE = ROOM_KEY + '/state';            // 房主发布的完整棋局（保留消息，新人一进来就能拿到）
+const T_EVT   = ROOM_KEY + '/evt';              // 玩家动作（落子/悔棋/新局），只有房主处理
+const whoTopic = id => ROOM_KEY + '/who/' + id; // 每人的在线状态（保留消息 + 掉线遗嘱自动清除）
 
-const state = { moves: [], log: [], winner: 0, winLine: null, pending: null };
+const state = { moves: [], log: [], winner: 0, winLine: null, pending: null, seq: 0, hostId: null };
 let board = [];
-let roster = [];
+let peers = new Map();   // id -> { id, name, team, ts }
 let profile = null;
-let netStarted = false;
-let lastHostMsg = 0;
+let lastStateAt = 0;
 
-const net = { peer: null, role: null, hostConn: null, conns: new Map(), claiming: false, claimTimer: null, hintShown: false };
+const net = { client: null, connected: false, allFailed: false, id: '', connectedAt: 0, wasHost: false, started: false, hintShown: false };
 
 const $ = id => document.getElementById(id);
 const canvas = $('board');
@@ -178,7 +172,6 @@ const posToXY = p => [p % N, Math.floor(p / N)];
 const posName = p => { const [x, y] = posToXY(p); return COLS[x] + (N - y); };
 const teamName = t => t === 1 ? '黑方' : t === 2 ? '白方' : '观战';
 const colorName = c => c === 1 ? '黑' : '白';
-const connOpen = c => !!(c && c.open);
 
 function rebuild() {
   board = Array.from({ length: N }, () => new Array(N).fill(0));
@@ -324,14 +317,12 @@ function toast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
 }
-function myKey() { return net.role === 'host' ? 'self' : (net.peer ? net.peer.id : null); }
-function netReady() { return net.role === 'host' || connOpen(net.hostConn); }
 
 function updateNetUI() {
   const b = $('netBadge');
-  if (!window.Peer) { b.className = 'bad'; b.textContent = '组件加载失败'; return; }
-  if (net.role === 'host') { b.className = 'ok'; b.textContent = '🟢 房主（你）'; }
-  else if (connOpen(net.hostConn)) { b.className = 'ok'; b.textContent = '🟢 已连接'; }
+  if (!window.mqtt) { b.className = 'bad'; b.textContent = '组件加载失败'; return; }
+  if (net.connected) { b.className = 'ok'; b.textContent = '🟢 已连接 · ' + peers.size + ' 人在线'; }
+  else if (net.allFailed) { b.className = 'bad'; b.textContent = '🔴 服务器暂不可达，重试中…'; }
   else { b.className = 'warn'; b.textContent = '🟡 连接中…'; }
 }
 function setStatus() {
@@ -348,8 +339,8 @@ function setStatus() {
   $('turnDot').className = 'dot ' + (c === 1 ? 'black' : 'white');
   $('turnText').textContent = '轮到' + teamName(c);
   let info = '第 ' + (state.moves.length + 1) + ' 手';
-  if (!window.Peer) info += ' · 组件加载中…';
-  else if (!netReady()) info += ' · 连接房间中…';
+  if (!window.mqtt) info += ' · 组件加载中…';
+  else if (!net.connected) info += ' · 连接房间中…';
   else if (!profile || profile.team === 0) info += ' · 观战中';
   else if (profile.team === c) info += ' · 该你方落子' + (state.pending ? '，再点一次确认 ' + posName(state.pending.y * N + state.pending.x) : '');
   else info += ' · 等待' + teamName(c) + '落子';
@@ -357,15 +348,14 @@ function setStatus() {
     const last = state.moves[state.moves.length - 1];
     info += ' · 上一手 ' + posName(last) + '（' + colorName(state.moves.length % 2 === 1 ? 1 : 2) + '）';
   }
-  info += ' · 在线 ' + roster.length + ' 人';
+  info += ' · 在线 ' + peers.size + ' 人';
   $('moveInfo').textContent = info;
 }
 function renderRoster() {
-  const mine = myKey();
   const html = team => {
-    const arr = roster.filter(r => r.team === team);
+    const arr = [...peers.values()].filter(r => r.team === team);
     if (!arr.length) return '<span class="empty">' + (team === 0 ? '—' : '虚位以待') + '</span>';
-    return arr.map(r => escapeHtml(r.name) + (r.key === mine ? '（我）' : '')).join('、');
+    return arr.map(r => escapeHtml(r.name) + (r.id === net.id ? '（我）' : '')).join('、');
   };
   $('rosterBlack').innerHTML = html(1);
   $('rosterWhite').innerHTML = html(2);
@@ -381,251 +371,250 @@ function updateAll() {
   draw();
   updateNetUI();
   setStatus();
-  const rj = JSON.stringify(roster), lj = JSON.stringify(state.log);
+  const rj = JSON.stringify([...peers.values()]), lj = JSON.stringify(state.log);
   if (rj !== lastRosterJson) { lastRosterJson = rj; renderRoster(); }
   if (lj !== lastLogJson) { lastLogJson = lj; renderLog(); }
 }
 
-/* ---------- 网络 ---------- */
+/* ---------- 网络：MQTT 服务器中转 ---------- */
+function decodeJson(payload) {
+  try { return JSON.parse(new TextDecoder().decode(payload)); } catch (e) { return null; }
+}
+
+function liveHostId() {
+  if (state.hostId && peers.has(state.hostId)) return state.hostId;
+  if (!peers.size) return null;
+  return [...peers.keys()].sort()[0];
+}
+function isHost() { return net.connected && peers.has(net.id) && liveHostId() === net.id; }
+
 function ensureNet() {
-  if (netStarted) return;
-  if (!window.Peer) return;   // ★ 改动点 5：脚本还没就位时不锁定，等 waitPeer 轮询到再进来
-  netStarted = true;
-
-  tryClaimHost(becomeGuest);
-
-  setInterval(() => {
-    if (net.role === 'guest') {
-      if (net.peer && net.peer.destroyed) { net.peer = null; becomeGuest(); return; }
-      if (net.peer && net.peer.open && !net.claiming && !connOpen(net.hostConn)) connectToHost();
-    }
-  }, 4000);
-  setInterval(() => { if (net.role === 'host') broadcastState(); }, 8000);
-  setInterval(() => {
-    if (net.role === 'guest' && connOpen(net.hostConn) && Date.now() - lastHostMsg > 25000) {
-      try { net.hostConn.close(); } catch (e) {}
-      net.hostConn = null;
-      updateNetUI(); setStatus(); scheduleClaim();
-    }
-  }, 5000);
+  if (net.started) return;
+  if (!window.mqtt) return;   // 脚本未就位时不锁定，等 waitMqtt 轮询到再进来
+  net.started = true;
+  net.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  connectBroker(0);
+  setInterval(publishMe, 20000);   // 定期刷新在线状态（保留消息）
+  setInterval(gcPeers, 15000);     // 清理失联玩家
+  setInterval(() => { if (isHost() && Date.now() - lastStateAt > 25000) publishState(); }, 10000);  // 房主心跳
   setTimeout(() => {
-    if (!net.hintShown && net.role === 'guest' && !connOpen(net.hostConn)) {
+    if (!net.hintShown && !net.connected) {
       net.hintShown = true;
       toast('一直连不上？点 QQ 右上角菜单 →「在浏览器中打开」再试');
     }
   }, 15000);
 }
 
-/* ★ 改动点 5：轮询等 window.Peer 就绪后再启动网络；10 秒仍没就绪才提示"组件加载失败" */
-function waitPeer(attempt) {
-  if (window.Peer) {
+function connectBroker(idx) {
+  if (!window.mqtt) return;
+  if (idx >= BROKERS.length) {
+    net.connected = false;
+    net.allFailed = true;
+    updateAll();
+    setTimeout(() => connectBroker(0), 15000);   // 全部失败，稍后从头重试
+    return;
+  }
+  let c;
+  try {
+    c = mqtt.connect(BROKERS[idx], {
+      clientId: 'wzq_' + net.id,
+      keepalive: 20,
+      clean: true,
+      reconnectPeriod: 0,          // 重连/换服务器由自己管理
+      connectTimeout: 8000,
+      will: { topic: whoTopic(net.id), payload: '', qos: 1, retain: true }   // 掉线遗嘱：自动清掉在线状态
+    });
+  } catch (e) { setTimeout(() => connectBroker(idx + 1), 200); return; }
+  net.client = c;
+  net.connected = false;
+  let everConnected = false, dead = false;
+  const guard = setTimeout(() => { if (!everConnected) onFail(); }, 11000);
+  const onFail = () => {
+    if (dead) return;
+    dead = true;
+    clearTimeout(guard);
+    try { c.end(true); } catch (e) {}
+    if (net.client === c) { net.client = null; net.connected = false; }
+    updateAll();
+    // 连上过就优先重试同一台，否则换下一家
+    setTimeout(() => connectBroker(everConnected ? idx : idx + 1), everConnected ? 3000 : 300);
+  };
+  c.on('error', onFail);
+  c.on('close', () => { if (everConnected) onFail(); });
+  c.on('connect', () => {
+    everConnected = true;
+    clearTimeout(guard);
+    net.connected = true;
+    net.connectedAt = Date.now();
+    net.allFailed = false;
+    c.subscribe(ROOM_KEY + '/#', { qos: 1 });
+    setTimeout(publishMe, 400);        // 稍等订阅生效，自己也能收到自己的在线状态
+    setTimeout(checkHostChange, 2500); // 若房间没人，自己成为房主并建房
+    updateAll();
+  });
+  c.on('message', onMessage);
+}
+
+function onMessage(topic, payload) {
+  if (topic === T_STATE) return onState(payload);
+  if (topic === T_EVT) return onEvt(payload);
+  const p = ROOM_KEY + '/who/';
+  if (topic.slice(0, p.length) === p) return onWho(topic.slice(p.length), payload);
+}
+
+function onWho(id, payload) {
+  const quiet = Date.now() - net.connectedAt < 3000;   // 刚连上时的保留消息洪峰，不刷动态
+  if (payload.length === 0) {   // 空消息 = 离开（主动退出或掉线遗嘱）
+    const gone = peers.get(id);
+    if (gone) {
+      peers.delete(id);
+      checkHostChange();
+      if (isHost() && !quiet) { addLog('「' + gone.name + '」离开'); publishState(); }
+      else updateAll();
+    }
+    return;
+  }
+  const d = decodeJson(payload);
+  if (!d) return;
+  const name = sanitizeName(d.name) || '无名群友';
+  const team = [0, 1, 2].includes(d.team) ? d.team : 0;
+  const old = peers.get(id);
+  peers.set(id, { id, name, team, ts: Date.now() });
+  checkHostChange();
+  if (isHost() && !quiet) {
+    if (!old) { addLog('「' + name + '」加入' + teamName(team)); publishState(); }
+    else if (old.name !== name || old.team !== team) { addLog('「' + name + '」切换到' + teamName(team)); publishState(); }
+    else updateAll();
+  } else updateAll();
+}
+
+function checkHostChange() {
+  const host = isHost();
+  if (host && !net.wasHost) {
+    if (state.seq === 0) {
+      // 全新房间：稍等片刻，确认没有旧棋局、也没有更早进来的人
+      if (Date.now() - net.connectedAt < 3000) { setTimeout(checkHostChange, 3000); return; }
+      state.moves = []; state.log = []; state.pending = null; state.winner = 0; state.winLine = null;
+      rebuild();
+      addLog('房间已创建，把链接发到群里吧');
+      publishState();
+    } else {
+      addLog('房主掉线，「' + (profile ? profile.name : '群友') + '」接管房间，棋局已恢复');
+      publishState();
+    }
+  }
+  net.wasHost = host;
+}
+
+function onState(payload) {
+  const d = decodeJson(payload);
+  if (!d || !Array.isArray(d.moves)) return;
+  const moves = sanitizeMoves(d.moves);
+  if (!moves || !Number.isInteger(d.seq) || d.seq < state.seq) return;
+  if (d.host === net.id) { lastStateAt = Date.now(); net.wasHost = true; return; }   // 自己发布的状态回显
+  state.seq = d.seq;
+  state.hostId = typeof d.host === 'string' ? d.host : null;
+  state.moves = moves;
+  if (Array.isArray(d.log)) state.log = d.log.slice(-80);
+  state.pending = null;
+  rebuild(); recomputeWinner();
+  checkHostChange();
+  saveRoom(); updateAll();
+}
+
+function onEvt(payload) {
+  if (!isHost()) return;   // 只有房主处理玩家动作
+  const d = decodeJson(payload);
+  if (!d || typeof d.from !== 'string') return;
+  if (d.k === 'move' && Number.isInteger(d.pos)) hostApplyMove(d.from, d.pos);
+  else if (d.k === 'undo') hostApplyUndo(d.from);
+  else if (d.k === 'reset') hostApplyReset(d.from);
+}
+
+function sendEvt(o) {
+  if (!net.client || !net.connected) return false;
+  try { net.client.publish(T_EVT, JSON.stringify(Object.assign({ from: net.id }, o)), { qos: 1 }); return true; }
+  catch (e) { return false; }
+}
+
+function publishMe() {
+  if (!net.client || !net.connected || !profile) return;
+  try { net.client.publish(whoTopic(net.id), JSON.stringify({ name: profile.name, team: profile.team }), { qos: 1, retain: true }); } catch (e) {}
+}
+function announceLeave() {
+  try { if (net.client && net.connected) net.client.publish(whoTopic(net.id), '', { qos: 1, retain: true }); } catch (e) {}
+}
+
+function gcPeers() {
+  const now = Date.now();
+  const gone = [];
+  peers.forEach((r, id) => {
+    if (id !== net.id && now - r.ts > 50000) { peers.delete(id); gone.push(r); }
+  });
+  if (gone.length) {
+    checkHostChange();
+    if (isHost()) { gone.forEach(r => addLog('「' + r.name + '」离开')); publishState(); }
+    else updateAll();
+  }
+}
+
+/* ---------- 房主逻辑（和原版一致，只是名单来自 peers） ---------- */
+function hostApplyMove(key, pos) {
+  const r = peers.get(key);
+  if (state.winner || !r || r.team === 0 || r.team !== currentColor() || !Number.isInteger(pos) || pos < 0 || pos > 224) { publishState(); return; }
+  const [x, y] = posToXY(pos);
+  if (board[y][x] !== 0) { publishState(); return; }
+  state.moves.push(pos);
+  state.pending = null;
+  rebuild(); recomputeWinner();
+  addLog('「' + r.name + '」落子 ' + posName(pos) + '（' + colorName(r.team) + '）');
+  if (state.winner) addLog(teamName(state.winner) + '五连获胜！本局共 ' + state.moves.length + ' 手 🏆');
+  publishState();
+}
+function hostApplyUndo(key) {
+  if (!state.moves.length) return;
+  const lastTeam = state.moves.length % 2 === 1 ? 1 : 2;
+  const r = peers.get(key);
+  if (!r || r.team !== lastTeam) { publishState(); return; }
+  const p = state.moves.pop();
+  state.pending = null;
+  rebuild(); recomputeWinner();
+  addLog('「' + r.name + '」悔棋，撤回 ' + posName(p));
+  publishState();
+}
+function hostApplyReset(key) {
+  const r = peers.get(key);
+  state.moves = []; state.pending = null;
+  rebuild(); state.winner = 0; state.winLine = null;
+  addLog('「' + (r ? r.name : '?') + '」发起新局，黑方先行');
+  publishState();
+}
+function publishState() {
+  if (!net.client || !net.connected) { updateAll(); return; }
+  state.seq = state.seq + 1;
+  state.hostId = net.id;
+  lastStateAt = Date.now();
+  try {
+    net.client.publish(T_STATE, JSON.stringify({ seq: state.seq, host: net.id, moves: state.moves, log: state.log.slice(-80) }), { qos: 1, retain: true });
+  } catch (e) {}
+  saveRoom(); updateAll();
+}
+
+/* 轮询等 mqtt 脚本就绪后再启动网络；10 秒仍没就绪提示失败 */
+function waitMqtt(attempt) {
+  if (window.mqtt) {
     updateNetUI();
     if (profile) ensureNet();
     return;
   }
-  if (attempt > 20) {   // 20 × 500ms = 10 秒
+  if (attempt > 20) {
     const b = $('netBadge');
     b.className = 'bad';
     b.textContent = '组件加载失败';
     toast('网络组件加载失败，建议切换网络或用系统浏览器打开');
     return;
   }
-  setTimeout(() => waitPeer(attempt + 1), 500);
-}
-
-function tryClaimHost(onFail) {
-  if (!window.Peer || net.role === 'host') { if (onFail) onFail(); return; }
-  if (net.claiming) { if (onFail) onFail(); return; }
-  net.claiming = true;
-  let settled = false;
-  const p = new Peer(ROOM_ID, PEER_OPTS);   // ★ 改动点 3：房主接上 ICE 配置
-  const finish = ok => {
-    if (settled) return;
-    settled = true;
-    net.claiming = false;
-    if (ok) becomeHost(p);
-    else { try { p.destroy(); } catch (e) {} if (onFail) onFail(); }
-  };
-  p.on('open', () => finish(true));
-  p.on('error', () => finish(false));
-}
-
-function scheduleClaim() {
-  if (net.claiming || net.role === 'host' || net.claimTimer) return;
-  net.claimTimer = setTimeout(() => {
-    net.claimTimer = null;
-    if (net.role === 'guest' && !connOpen(net.hostConn)) tryClaimHost(null);
-  }, 1200 + Math.random() * 2300);
-}
-
-function becomeHost(p) {
-  if (net.peer && net.peer !== p) { try { net.peer.destroy(); } catch (e) {} }
-  net.peer = p;
-  net.role = 'host';
-  net.hostConn = null;
-  net.conns.clear();
-  const saved = loadSavedState();
-  const moves = saved ? sanitizeMoves(saved.moves) : null;
-  const migration = !!(moves && moves.length);
-  state.moves = moves ? moves.slice() : [];
-  state.log = (saved && Array.isArray(saved.log) ? saved.log.slice() : []).slice(-80);
-  state.pending = null;
-  rebuild(); recomputeWinner();
-  profile = profile || { name: '群友', team: 0 };
-  roster = [{ key: 'self', name: profile.name, team: profile.team }];
-  if (migration) addLog('房主掉线，「' + profile.name + '」接管房间，棋局已恢复');
-  else addLog('房间已创建，把链接发到群里吧');
-  p.on('connection', wireGuest);
-  p.on('disconnected', () => { try { p.reconnect(); } catch (e) {} });
-  p.on('error', err => {
-    if (err && err.type === 'unavailable-id') {
-      try { p.destroy(); } catch (e) {}
-      net.peer = null; becomeGuest();
-    }
-  });
-  saveRoom(); updateAll();
-}
-
-function becomeGuest() {
-  net.role = 'guest';
-  net.hostConn = null;
-  if (net.peer) { try { net.peer.destroy(); } catch (e) {} net.peer = null; }
-  const p = new Peer(PEER_OPTS);   // ★ 改动点 4：房客接上 ICE 配置
-  net.peer = p;
-  p.on('open', () => connectToHost());
-  p.on('disconnected', () => { try { p.reconnect(); } catch (e) {} });
-  p.on('error', err => {
-    if (err && err.type === 'peer-unavailable') {
-      net.hostConn = null;
-      updateNetUI(); setStatus(); scheduleClaim();
-    }
-  });
-  updateNetUI(); setStatus();
-}
-
-function connectToHost() {
-  if (net.role !== 'guest' || !net.peer || !net.peer.open) return;
-  if (connOpen(net.hostConn)) return;
-  const conn = net.peer.connect(ROOM_ID, { reliable: true });
-  net.hostConn = conn;
-  conn.on('open', () => {
-    lastHostMsg = Date.now();
-    conn.send({ t: 'join', name: profile.name, team: profile.team });
-    updateNetUI(); setStatus();
-    toast('已连接房间');
-  });
-  conn.on('data', handleHostData);
-  const onLost = () => {
-    if (net.hostConn === conn) {
-      net.hostConn = null;
-      updateNetUI(); setStatus(); scheduleClaim();
-    }
-  };
-  conn.on('close', onLost);
-  conn.on('error', onLost);
-}
-
-function wireGuest(conn) {
-  const onGone = () => {
-    if (net.conns.get(conn.peer) !== conn) return;
-    net.conns.delete(conn.peer);
-    const r = roster.find(r => r.key === conn.peer);
-    roster = roster.filter(r => r.key !== conn.peer);
-    if (r) addLog('「' + r.name + '」离开');
-    broadcastState();
-  };
-  conn.on('open', () => {
-    const old = net.conns.get(conn.peer);
-    if (old && old !== conn) { try { old.close(); } catch (e) {} }
-    net.conns.set(conn.peer, conn);
-  });
-  conn.on('data', d => handleGuestMsg(conn, d));
-  conn.on('close', onGone);
-  conn.on('error', onGone);
-}
-
-function handleGuestMsg(conn, d) {
-  if (!d || typeof d !== 'object' || net.role !== 'host') return;
-  switch (d.t) {
-    case 'join':
-    case 'profile': {
-      const name = sanitizeName(d.name) || '无名群友';
-      const team = [0, 1, 2].includes(d.team) ? d.team : 0;
-      net.conns.set(conn.peer, conn);
-      const isNew = !roster.some(r => r.key === conn.peer);
-      upsertRoster(conn.peer, name, team);
-      addLog('「' + name + '」' + (d.t === 'join' ? '加入' : '切换到') + teamName(team));
-      broadcastState();
-      break;
-    }
-    case 'move':
-      if (Number.isInteger(d.pos)) hostApplyMove(conn.peer, d.pos);
-      break;
-    case 'undo':  hostApplyUndo(conn.peer); break;
-    case 'reset': hostApplyReset(conn.peer); break;
-  }
-}
-function upsertRoster(key, name, team) {
-  const r = roster.find(r => r.key === key);
-  if (r) { r.name = name; r.team = team; }
-  else roster.push({ key, name, team });
-}
-
-function hostApplyMove(key, pos) {
-  if (state.winner || !Number.isInteger(pos) || pos < 0 || pos > 224) { broadcastState(); return; }
-  const r = roster.find(r => r.key === key);
-  if (!r || r.team === 0 || r.team !== currentColor()) { broadcastState(); return; }
-  const [x, y] = posToXY(pos);
-  if (board[y][x] !== 0) { broadcastState(); return; }
-  state.moves.push(pos);
-  state.pending = null;
-  rebuild(); recomputeWinner();
-  addLog('「' + r.name + '」落子 ' + posName(pos) + '（' + colorName(r.team) + '）');
-  if (state.winner) addLog(teamName(state.winner) + '五连获胜！本局共 ' + state.moves.length + ' 手 🏆');
-  broadcastState();
-}
-function hostApplyUndo(key) {
-  if (!state.moves.length) return;
-  const lastTeam = state.moves.length % 2 === 1 ? 1 : 2;
-  const r = roster.find(r => r.key === key);
-  if (!r || r.team !== lastTeam) { broadcastState(); return; }
-  const p = state.moves.pop();
-  state.pending = null;
-  rebuild(); recomputeWinner();
-  addLog('「' + r.name + '」悔棋，撤回 ' + posName(p));
-  broadcastState();
-}
-function hostApplyReset(key) {
-  const r = roster.find(r => r.key === key);
-  state.moves = []; state.pending = null;
-  rebuild(); state.winner = 0; state.winLine = null;
-  addLog('「' + (r ? r.name : '?') + '」发起新局，黑方先行');
-  broadcastState();
-}
-function broadcastState() {
-  const msg = { t: 'state', moves: state.moves.slice(), roster, log: state.log.slice() };
-  net.conns.forEach(c => { if (c.open) { try { c.send(msg); } catch (e) {} } });
-  saveRoom(); updateAll();
-}
-
-function handleHostData(d) {
-  if (!d || typeof d !== 'object' || d.t !== 'state') return;
-  lastHostMsg = Date.now();
-  const moves = sanitizeMoves(d.moves);
-  if (!moves) return;
-  state.moves = moves;
-  if (Array.isArray(d.roster)) {
-    roster = d.roster
-      .filter(r => r && typeof r.name === 'string')
-      .map(r => ({ key: r.key, name: String(r.name).slice(0, 10), team: [0, 1, 2].includes(r.team) ? r.team : 0 }));
-  }
-  if (Array.isArray(d.log)) state.log = d.log.slice(-80);
-  rebuild(); recomputeWinner();
-  if (state.pending) {
-    const { x, y } = state.pending;
-    if (state.winner || board[y][x] !== 0 || !profile || profile.team !== currentColor()) state.pending = null;
-  }
-  saveRoom(); updateAll();
+  setTimeout(() => waitMqtt(attempt + 1), 500);
 }
 
 /* ---------- 交互 ---------- */
@@ -633,8 +622,8 @@ canvas.addEventListener('pointerdown', function (e) {
   e.preventDefault();
   if (!profile) { showEntry(false); return; }
   if (state.winner) { toast('本局已结束，点「新局」再开一盘'); return; }
-  if (!window.Peer) { toast('组件还在加载，稍等几秒…'); return; }
-  if (!netReady()) { toast('还没连上房间，稍等几秒…'); return; }
+  if (!window.mqtt) { toast('组件还在加载，稍等几秒…'); return; }
+  if (!net.connected) { toast('还没连上房间，稍等几秒…'); return; }
   if (profile.team === 0) { toast('观战中，点「名字/阵营」可加入一方'); return; }
   if (profile.team !== currentColor()) { toast('现在轮到' + teamName(currentColor()) + '落子'); return; }
   const rect = canvas.getBoundingClientRect();
@@ -656,13 +645,14 @@ canvas.addEventListener('pointerdown', function (e) {
 
 function doPlace(x, y) {
   const pos = y * N + x;
-  if (net.role === 'host') { hostApplyMove('self', pos); return; }
-  if (!connOpen(net.hostConn)) { toast('还没连上房间'); return; }
+  if (isHost()) { hostApplyMove(net.id, pos); return; }
+  if (!net.connected) { toast('还没连上房间'); return; }
+  // 先本地落子（乐观更新），房主确认后以广播为准
   state.moves.push(pos);
   state.pending = null;
   rebuild(); recomputeWinner();
   draw(); setStatus();
-  try { net.hostConn.send({ t: 'move', pos }); } catch (e) {}
+  if (!sendEvt({ k: 'move', pos })) toast('还没连上房间');
 }
 
 $('btnUndo').addEventListener('click', function () {
@@ -672,16 +662,14 @@ $('btnUndo').addEventListener('click', function () {
   if (profile.team !== lastTeam) { toast('这手是' + teamName(lastTeam) + '下的，由他们发起悔棋'); return; }
   const p = state.moves[state.moves.length - 1];
   if (!confirm('撤回最后一手（' + posName(p) + '）？')) return;
-  if (net.role === 'host') hostApplyUndo('self');
-  else if (connOpen(net.hostConn)) net.hostConn.send({ t: 'undo' });
-  else toast('还没连上房间');
+  if (isHost()) hostApplyUndo(net.id);
+  else if (!sendEvt({ k: 'undo' })) toast('还没连上房间');
 });
 
 $('btnNew').addEventListener('click', function () {
   if (!confirm('发起新的一局？棋盘清空，黑方先行。')) return;
-  if (net.role === 'host') hostApplyReset('self');
-  else if (connOpen(net.hostConn)) net.hostConn.send({ t: 'reset' });
-  else toast('还没连上房间');
+  if (isHost()) hostApplyReset(net.id);
+  else if (!sendEvt({ k: 'reset' })) toast('还没连上房间');
 });
 
 $('btnProfile').addEventListener('click', () => showEntry(true));
@@ -697,18 +685,11 @@ function showEntry(edit) {
 function submitEntry(team) {
   const name = sanitizeName($('nameInput').value);
   if (!name) { toast('先输入名字'); $('nameInput').focus(); return; }
-  const isNew = !profile;
   profile = { name, team };
   try { localStorage.setItem(LS_PROFILE, JSON.stringify(profile)); } catch (e) {}
   $('entry').classList.add('hidden');
-  if (net.role === 'host') {
-    upsertRoster('self', name, team);
-    addLog('「' + name + '」' + (isNew ? '加入' : '切换到') + teamName(team));
-    broadcastState();
-  } else if (connOpen(net.hostConn)) {
-    net.hostConn.send({ t: 'profile', name, team });
-  }
   ensureNet();
+  publishMe();   // 已连接时立即广播新名字/阵营
   updateAll();
 }
 $('pickBlack').addEventListener('click', () => submitEntry(1));
@@ -718,6 +699,8 @@ $('entryCancel').addEventListener('click', () => $('entry').classList.add('hidde
 
 /* ---------- 启动 ---------- */
 window.addEventListener('resize', resizeCanvas);
+window.addEventListener('pagehide', announceLeave);
+window.addEventListener('beforeunload', announceLeave);
 (function init() {
   resizeCanvas();
   profile = loadProfile();
@@ -728,15 +711,10 @@ window.addEventListener('resize', resizeCanvas);
     state.log = Array.isArray(saved.log) ? saved.log.slice(-80) : [];
     rebuild(); recomputeWinner();
   }
-  // ★ 改动点 5：不再直接判断 window.Peer，改为轮询等待
-  if (profile) showEntryViewOnly();
-  else showEntry(false);
-  waitPeer(0);
+  if (!profile) showEntry(false);
+  waitMqtt(0);
   updateAll();
 })();
-
-/* 已有 profile 时不弹入场窗，静等 waitPeer 自动连房 */
-function showEntryViewOnly() { /* no-op，仅做语义占位 */ }
 })();
 </script>
 </body>
