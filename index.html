@@ -3,116 +3,158 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#f4ede0">
+<meta name="theme-color" content="#0d0b09">
 <title>猫社五子棋</title>
+<link rel="icon" href="data:,">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  body { font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; background:#f4ede0; color:#3a2f28; min-height:100vh; padding:16px 12px calc(24px + env(safe-area-inset-bottom)); }
-  .app { max-width:560px; margin:0 auto; }
-  header { display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; }
-  h1 { font-size:22px; letter-spacing:2px; }
-  h1 .sub { font-size:12px; color:#a0622d; background:#f7e3c2; padding:2px 8px; border-radius:10px; vertical-align:middle; margin-left:6px; }
-  #netBadge { font-size:12px; padding:3px 10px; border-radius:10px; background:#eee2cc; color:#8c7a5e; }
-  #netBadge.ok { background:#d9efdd; color:#2e7d43; }
-  #netBadge.warn { background:#f7e8c8; color:#a06b00; }
-  #netBadge.bad { background:#f5d7d3; color:#b3402e; }
-  #modeBadge { font-size:12px; padding:3px 10px; border-radius:10px; background:#eee2cc; color:#8c7a5e; }
-  #modeBadge.ffa { background:#f6ddd4; color:#a8412a; }
-  .view-link { font-size:12px; padding:3px 10px; border-radius:10px; background:#f3e0c4; color:#8a5a2a; text-decoration:none; border:1px solid #e0c49c; }
-  .view-link:active { background:#e9d3b2; }
-  #statusBar { display:flex; align-items:center; justify-content:center; gap:8px; background:#fffdf8; border:1px solid #e3d4bc; border-radius:12px; padding:9px 12px; margin-top:10px; font-size:14px; flex-wrap:wrap; }
-  .dot { width:14px; height:14px; border-radius:50%; display:inline-block; border:1px solid rgba(0,0,0,.2); flex:none; }
-  .dot.black { background:radial-gradient(circle at 35% 30%, #666, #111); }
+  html, body { width:100%; height:100%; overflow:hidden; }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    color:#f3ead9;
+    background: radial-gradient(circle at 50% 22%, #2b2118 0%, #17110d 45%, #080706 100%);
+  }
+  #scene { position:fixed; inset:0; }
+  #scene canvas { display:block; width:100%; height:100%; touch-action:none; }
+  #loading { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; background:#0b0908; z-index:60; transition:opacity .6s; }
+  #loading.hide { opacity:0; pointer-events:none; }
+  #loading .ring { width:34px; height:34px; border-radius:50%; border:3px solid #4a3520; border-top-color:#e0b36a; animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #loading p { font-size:13px; color:#a08a6c; letter-spacing:1px; }
+
+  .hud { position:fixed; z-index:20; pointer-events:none; }
+  .hud > * { pointer-events:auto; }
+  header.top { top:0; left:0; right:0; padding:calc(12px + env(safe-area-inset-top)) 14px 0; display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap; }
+  .brand { display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:14px; background:rgba(20,15,11,.62); border:1px solid rgba(224,179,106,.22); backdrop-filter:blur(10px); }
+  .brand h1 { font-size:17px; letter-spacing:1px; font-weight:700; white-space:nowrap; }
+  .brand h1 span { font-size:11px; color:#e0b36a; border:1px solid rgba(224,179,106,.45); border-radius:8px; padding:1px 6px; margin-left:6px; vertical-align:middle; }
+  .badges { display:flex; gap:6px; align-items:center; padding-top:4px; }
+  .badge { font-size:11px; padding:4px 9px; border-radius:9px; background:rgba(255,255,255,.08); color:#cbb998; border:1px solid rgba(255,255,255,.08); white-space:nowrap; }
+  .badge.ok { background:rgba(64,160,92,.22); color:#9fe3b0; border-color:rgba(64,160,92,.35); }
+  .badge.warn { background:rgba(200,150,40,.18); color:#f0cd82; border-color:rgba(200,150,40,.3); }
+  .badge.bad { background:rgba(190,60,50,.2); color:#ff9d90; border-color:rgba(190,60,50,.35); }
+  .badge.ffa { background:rgba(190,80,50,.25); color:#ffb59b; border-color:rgba(190,80,50,.4); }
+
+  .top-actions { margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+  .chip-btn {
+    font:inherit; font-size:12px; color:#e8d9bd; background:rgba(20,15,11,.62); border:1px solid rgba(224,179,106,.25);
+    border-radius:11px; padding:7px 10px; cursor:pointer; backdrop-filter:blur(10px); text-decoration:none; display:inline-flex; align-items:center; gap:4px;
+  }
+  .chip-btn:active { transform:scale(.96); background:rgba(60,45,30,.75); }
+  .chip-btn.primary { border-color:rgba(224,179,106,.5); color:#f6dfb2; }
+
+  .bottom { left:0; right:0; bottom:0; padding:0 12px calc(12px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; align-items:center; gap:8px; }
+  #statusBar {
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:center;
+    background:rgba(20,15,11,.7); border:1px solid rgba(224,179,106,.2); border-radius:14px;
+    padding:8px 14px; font-size:13px; backdrop-filter:blur(12px); max-width:640px;
+  }
+  .dot { width:12px; height:12px; border-radius:50%; display:inline-block; border:1px solid rgba(0,0,0,.35); flex:none; }
+  .dot.black { background:radial-gradient(circle at 35% 30%, #777, #0b0b0b); }
   .dot.white { background:radial-gradient(circle at 35% 30%, #fff, #cfc9bd); }
-  .dot.red { background:radial-gradient(circle at 35% 30%, #ff8a7a, #b71c1c); }
-  .dot.blue { background:radial-gradient(circle at 35% 30%, #7cc0ff, #0d47a1); }
-  #myTeamChip { font-size:12px; padding:2px 10px; border-radius:10px; background:#8c7a5e; color:#fff; }
-  #myTeamChip.black { background:#222; }
-  #myTeamChip.white { background:#e8e2d5; color:#444; }
-  #myTeamChip.red { background:#b71c1c; color:#fff; }
-  #myTeamChip.blue { background:#0d47a1; color:#fff; }
-  #moveInfo { color:#8c7a5e; font-size:12px; width:100%; text-align:center; }
-  .board-wrap { margin:12px 0; display:flex; justify-content:center; }
-  canvas { touch-action:none; border-radius:8px; box-shadow:0 4px 16px rgba(90,60,20,.18); cursor:pointer; }
-  .actions { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
-  button { font-size:14px; border-radius:10px; padding:10px 6px; flex:1; border:1px solid #d8c5a5; background:#fffdf8; color:#5a4a34; cursor:pointer; font-family:inherit; }
-  button:active { transform:scale(.97); background:#f2e8d8; }
-  button:disabled { opacity:.55; cursor:not-allowed; }
-  .actions button { min-width:72px; }
-  .panel { background:#fffdf8; border:1.5px solid #e3d4bc; border-radius:14px; padding:12px; margin-bottom:12px; }
-  .panel h2 { font-size:13px; color:#8c7a5e; margin-bottom:8px; font-weight:600; }
-  .team-row { display:flex; gap:8px; font-size:13px; padding:5px 0; align-items:baseline; }
-  .team-row .t { flex:none; width:74px; font-weight:600; }
-  .team-row .names { color:#5a4a34; line-height:1.7; word-break:break-all; }
-  .team-row .empty { color:#b3a488; }
-  #log { max-height:128px; overflow-y:auto; font-size:12px; color:#7a6a50; line-height:1.9; }
-  #log div { border-bottom:1px dashed #efe6d3; }
-  .help { margin-top:14px; font-size:13px; color:#7a6a50; line-height:1.8; }
-  .help summary { cursor:pointer; font-weight:600; color:#5a4a34; }
-  .help ol { padding-left:20px; margin-top:6px; }
-  footer { text-align:center; font-size:11px; color:#b3a488; margin-top:16px; }
-  #entry { position:fixed; inset:0; background:rgba(40,30,20,.5); display:flex; align-items:center; justify-content:center; padding:20px; z-index:30; }
-  #entry.hidden { display:none; }
-  .entry-card { background:#fffdf8; border-radius:16px; padding:20px; width:100%; max-width:380px; max-height:88vh; overflow-y:auto; }
-  .entry-card h3 { font-size:18px; margin-bottom:4px; text-align:center; }
-  .entry-card .tip { font-size:12px; color:#8c7a5e; text-align:center; margin-bottom:14px; }
-  #nameInput { width:100%; font-size:16px; padding:10px 12px; border:1.5px solid #d8c5a5; border-radius:10px; background:#faf5ea; margin-bottom:12px; font-family:inherit; }
-  #nameInput:focus { outline:none; border-color:#a0622d; }
-  .side-btn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; margin-bottom:8px; padding:12px; font-size:15px; flex:none; }
-  .sdot { width:16px; height:16px; border-radius:50%; border:1px solid rgba(0,0,0,.25); flex:none; }
-  #toast { position:fixed; left:50%; bottom:calc(30px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(20px); background:rgba(43,39,36,.92); color:#fff; font-size:14px; padding:10px 18px; border-radius:22px; opacity:0; transition:.25s; pointer-events:none; z-index:40; max-width:86vw; text-align:center; }
+  .dot.red { background:radial-gradient(circle at 35% 30%, #ff8a7a, #a4170e); }
+  .dot.blue { background:radial-gradient(circle at 35% 30%, #7cc0ff, #123c7d); }
+  #myTeamChip { font-size:11px; padding:2px 9px; border-radius:9px; background:#5c4a35; color:#fff; }
+  #myTeamChip.black { background:#1b1b1b; color:#f0e7d6; }
+  #myTeamChip.white { background:#efe8d9; color:#3a2f22; }
+  #myTeamChip.red { background:#9e1f16; color:#fff; }
+  #myTeamChip.blue { background:#1b3f7a; color:#dfe9ff; }
+  #moveInfo { color:#b7a17f; font-size:11px; width:100%; text-align:center; }
+  .actions { display:flex; gap:8px; }
+  .actions button { font:inherit; font-size:13px; color:#f0e3c9; background:rgba(20,15,11,.7); border:1px solid rgba(224,179,106,.25); border-radius:12px; padding:9px 18px; cursor:pointer; backdrop-filter:blur(10px); }
+  .actions button:active { transform:scale(.96); background:rgba(70,52,32,.8); }
+
+  .hint { font-size:10px; color:#7e6b50; letter-spacing:.5px; }
+
+  #panel {
+    position:fixed; z-index:30; top:calc(64px + env(safe-area-inset-top)); right:12px; width:300px; max-height:calc(100vh - 160px);
+    background:rgba(18,13,10,.88); border:1px solid rgba(224,179,106,.22); border-radius:16px; padding:14px;
+    backdrop-filter:blur(16px); overflow-y:auto; transform:translateX(20px); opacity:0; pointer-events:none; transition:.25s;
+  }
+  #panel.open { transform:none; opacity:1; pointer-events:auto; }
+  #panel h2 { font-size:12px; color:#a08a6c; font-weight:600; letter-spacing:1px; margin:6px 0 6px; }
+  #panel .panel-head { display:flex; align-items:center; justify-content:space-between; }
+  #panel .panel-head h2 { margin:0; }
+  #panelClose { font:inherit; color:#c9b795; background:none; border:none; font-size:16px; cursor:pointer; padding:2px 6px; }
+  .team-row { display:flex; gap:8px; font-size:12px; padding:5px 0; align-items:baseline; border-bottom:1px dashed rgba(255,255,255,.05); }
+  .team-row .t { flex:none; width:72px; font-weight:600; color:#e7d5b4; }
+  .team-row .names { color:#c2b092; line-height:1.7; word-break:break-all; }
+  .team-row .empty { color:#6f604b; }
+  #log { font-size:11px; color:#9c8a70; line-height:1.9; max-height:220px; overflow-y:auto; }
+  #log div { border-bottom:1px dashed rgba(255,255,255,.04); padding:2px 0; }
+
+  #toast {
+    position:fixed; left:50%; bottom:calc(120px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(12px);
+    background:rgba(30,24,18,.94); color:#f3e6cf; font-size:13px; padding:10px 18px; border-radius:22px;
+    opacity:0; transition:.25s; pointer-events:none; z-index:50; max-width:86vw; text-align:center;
+    border:1px solid rgba(224,179,106,.25);
+  }
   #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  #entry { position:fixed; inset:0; z-index:55; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(5,4,3,.66); backdrop-filter:blur(4px); }
+  #entry.hidden { display:none; }
+  .entry-card { width:100%; max-width:380px; max-height:88vh; overflow-y:auto; background:rgba(22,16,12,.97); border:1px solid rgba(224,179,106,.3); border-radius:18px; padding:20px; box-shadow:0 20px 60px rgba(0,0,0,.6); }
+  .entry-card h3 { font-size:18px; text-align:center; margin-bottom:4px; color:#f6e6c9; }
+  .entry-card .tip { font-size:12px; color:#a08a6c; text-align:center; margin-bottom:14px; line-height:1.6; }
+  #nameInput { width:100%; font:inherit; font-size:16px; color:#f4e8d2; padding:11px 12px; border-radius:11px; border:1px solid rgba(224,179,106,.28); background:rgba(255,255,255,.05); margin-bottom:12px; }
+  #nameInput:focus { outline:none; border-color:#e0b36a; }
+  .side-btn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; margin-bottom:8px; padding:12px; font:inherit; font-size:15px; color:#efe1c7; background:rgba(255,255,255,.05); border:1px solid rgba(224,179,106,.2); border-radius:12px; cursor:pointer; }
+  .side-btn:active { background:rgba(255,255,255,.12); }
+  .side-btn:disabled { opacity:.5; cursor:not-allowed; }
+  .sdot { width:15px; height:15px; border-radius:50%; border:1px solid rgba(0,0,0,.35); flex:none; }
+  #entryCancel { width:100%; padding:10px; font:inherit; font-size:13px; color:#b9a586; background:none; border:none; cursor:pointer; }
+
+  @media (max-width: 720px) {
+    .brand h1 { font-size:15px; }
+    .brand { padding:7px 10px; }
+    .badges { order:3; width:100%; padding-top:2px; }
+    .top-actions { gap:5px; }
+    .chip-btn { font-size:11px; padding:6px 8px; }
+    #panel { top:auto; bottom:calc(96px + env(safe-area-inset-bottom)); left:12px; right:12px; width:auto; max-height:52vh; transform:translateY(20px); }
+    #panel.open { transform:none; }
+    #statusBar { font-size:12px; gap:6px; padding:7px 10px; }
+    .actions button { padding:8px 14px; }
+    .hint { display:none; }
+  }
 </style>
 </head>
 <body>
-<div class="app">
-  <header>
-    <h1>猫社五子棋 <span class="sub">同房对战</span></h1>
-    <span id="netBadge" class="warn">加载中…</span>
-    <span id="modeBadge">双人接力</span>
-    <a class="view-link" href="3d.html">🧊 3D</a>
-  </header>
+<div id="scene"></div>
+<div id="loading"><div class="ring"></div><p>正在铺开棋盘…</p></div>
 
+<header class="hud top">
+  <div class="brand"><h1>猫社五子棋 <span>3D</span></h1></div>
+  <div class="badges">
+    <span id="netBadge" class="badge warn">加载中…</span>
+    <span id="modeBadge" class="badge">双人接力</span>
+  </div>
+  <div class="top-actions">
+    <button class="chip-btn" id="btnProfile">👤 名字/座位</button>
+    <button class="chip-btn" id="btnMode">🎲 换模式</button>
+    <button class="chip-btn primary" id="btnPanel">☰ 房间</button>
+  </div>
+</header>
+
+<div class="hud bottom">
   <div id="statusBar">
     <span id="turnDot" class="dot black"></span>
     <span id="turnText">轮到黑方</span>
     <span id="myTeamChip">未加入</span>
     <span id="moveInfo">第 1 手 · 黑方先行</span>
   </div>
-
-  <div class="board-wrap"><canvas id="board"></canvas></div>
-
   <div class="actions">
     <button id="btnUndo">↩ 悔棋</button>
     <button id="btnNew">🔄 新局</button>
-    <button id="btnProfile">👤 名字/座位</button>
-    <button id="btnMode">🎲 换模式</button>
   </div>
-
-  <section class="panel">
-    <h2>在场群友</h2>
-    <div id="rosterRows"></div>
-  </section>
-
-  <section class="panel">
-    <h2>房间动态</h2>
-    <div id="log"></div>
-  </section>
-
-  <details class="help">
-    <summary>📖 玩法说明</summary>
-    <ol>
-      <li><b>进房间</b>：所有人点群里的同一个链接，输入名字后选座位即可入场。</li>
-      <li><b>两种模式</b>：双人接力（黑/白两队，每队不限人数，轮流接力）；四人乱战（最多 4 人，每人一色，按 1→2→3→4 号位轮流落子）。点「🎲 换模式」切换，切换会清空棋盘。</li>
-      <li><b>落子</b>：点交叉点选中（出现预览子），<b>再点一次同一位置</b>确认。</li>
-      <li><b>悔棋</b>：由刚落子那一方（乱战里是那一号位）的成员发起，撤回最后一手。</li>
-      <li><b>自动房主</b>：系统自动在在线玩家中推选一名房主；房主掉线会自动换人接管，棋局留存在云端，随时接着下。</li>
-      <li><b>连不上？</b>：点 QQ 右上角「…」→ 用系统浏览器打开链接再试。</li>
-    </ol>
-  </details>
-
-  <footer>免费公共服务器中转（MQTT）· 双人接力 / 四人乱战 · 棋局云端留存</footer>
+  <div class="hint">拖动旋转 · 滚轮/双指缩放 · 点两下同一交叉点确认落子</div>
 </div>
+
+<aside id="panel">
+  <div class="panel-head"><h2>在场群友</h2><button id="panelClose">✕</button></div>
+  <div id="rosterRows"></div>
+  <h2>房间动态</h2>
+  <div id="log"></div>
+</aside>
 
 <div id="entry" class="hidden">
   <div class="entry-card">
@@ -126,7 +168,6 @@
 
 <div id="toast"></div>
 
-<!-- 依次尝试多 CDN 加载 MQTT 客户端，任一成功即停 -->
 <script>
 (function loadMqtt(fallbacks) {
   if (!fallbacks.length) return;
@@ -144,55 +185,44 @@
 ]);
 </script>
 
-<script>
-(function () {
-'use strict';
+<script type="module">
+import * as THREE from './vendor/three.module.min.js';
+
+/* ================= 常量 ================= */
 const N = 15;
 const COLS = 'ABCDEFGHIJKLMNO';
-const ROOM_KEY = 'wzq-r2-m8qk3x';   // 房间频道名，记得改成自己的随机串，避免和别的群撞房间
+const S = 1;
+const HALF = (N - 1) / 2;
+const ROOM_KEY = 'wzq-r2-m8qk3x';
 const LS_PROFILE = 'wzq_room_profile_v1';
-const LS_STATE   = 'wzq_room_state_v1';
-
-/* 座位：双人接力用 1/2（黑/白）；四人乱战用 1-4（黑/白/红/蓝） */
+const LS_STATE = 'wzq_room_state_v1';
 const SEAT_NAMES = { 0: '观战', 1: '黑方', 2: '白方', 3: '红方', 4: '蓝方' };
 const SEAT_CLASS = { 0: '', 1: 'black', 2: 'white', 3: 'red', 4: 'blue' };
-const MODE_NAME  = { team: '双人接力', ffa: '四人乱战' };
-const STONE = {
-  1: ['#585858', '#0d0d0d'],
-  2: ['#ffffff', '#c8c2b6'],
-  3: ['#ff7a6a', '#b71c1c'],
-  4: ['#6fb6ff', '#0d47a1']
-};
+const MODE_NAME = { team: '双人接力', ffa: '四人乱战' };
+const BROKERS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt'];
+const T_STATE = ROOM_KEY + '/state';
+const T_EVT = ROOM_KEY + '/evt';
+const whoTopic = id => ROOM_KEY + '/who/' + id;
+const STONE_HEX = { 1: 0x111112, 2: 0xf5efe2, 3: 0xb52a1f, 4: 0x1f4f9e };
 
-/* 免费 MQTT 中转服务器（无需注册），依次尝试；以后自建服务器只需换这里的地址 */
-const BROKERS = [
-  'wss://broker.emqx.io:8084/mqtt',
-  'wss://broker.hivemq.com:8884/mqtt'
-];
-const T_STATE = ROOM_KEY + '/state';            // 房主发布的完整棋局（保留消息，新人一进来就能拿到）
-const T_EVT   = ROOM_KEY + '/evt';              // 玩家动作（落子/悔棋/新局/换模式），只有房主处理
-const whoTopic = id => ROOM_KEY + '/who/' + id; // 每人的在线状态（保留消息 + 掉线遗嘱自动清除）
-
+/* ================= 状态 ================= */
 const state = { mode: 'team', moves: [], owners: [], log: [], winner: 0, winLine: null, pending: null, seq: 0, hostId: null, turn: 1 };
 let board = [];
-let peers = new Map();   // id -> { id, name, team, ts }
+let peers = new Map();
 let profile = null;
 let lastStateAt = 0;
-
 const net = { client: null, connected: false, allFailed: false, scriptFailed: false, id: '', connectedAt: 0, wasHost: false, started: false, hintShown: false };
 
 const $ = id => document.getElementById(id);
-const canvas = $('board');
-const ctx = canvas.getContext('2d');
-let cssSize = 0, cell = 0, margin = 0, dpr = 1;
 
-/* ---------- 规则 ---------- */
+/* ================= 规则（与 2D 版一致） ================= */
 const isFfa = () => state.mode === 'ffa';
 const currentColor = () => isFfa() ? (state.turn || 1) : (state.moves.length % 2 === 0 ? 1 : 2);
 const seatName = t => SEAT_NAMES[t] || '观战';
 const seatClass = t => SEAT_CLASS[t] || '';
 const posToXY = p => [p % N, Math.floor(p / N)];
 const posName = p => { const [x, y] = posToXY(p); return COLS[x] + (N - y); };
+const cellToWorld = (x, y) => new THREE.Vector3((x - HALF) * S, 0, (y - HALF) * S);
 
 function seatOccupied(t) {
   for (const r of peers.values()) if (r.team === t) return r;
@@ -215,7 +245,6 @@ function normalizeTurn() {
     state.turn = nextSeat(state.turn || 0);
   }
 }
-
 function rebuild() {
   board = Array.from({ length: N }, () => new Array(N).fill(0));
   state.moves.forEach((p, i) => {
@@ -256,32 +285,27 @@ function sanitizeState(m, owners, mode) {
     for (const s of owners) { if (!Number.isInteger(s) || s < 1 || s > max) return null; }
     own = owners.slice();
   } else if (mode === 'ffa') {
-    return null;   // 乱战必须带座位信息，否则颜色无法还原
+    return null;
   }
   if (!own) own = m.map((_, i) => (i % 2 === 0 ? 1 : 2));
   return { moves: m, owners: own };
 }
 function sanitizeName(s) { return String(s == null ? '' : s).trim().replace(/\s+/g, ' ').slice(0, 10); }
-
-/* 双人接力里没有 3/4 号位：切回团队模式时，坐在 3/4 的人自动转观战 */
-function normalizeProfileSeat() {
-  if (state.mode === 'team' && profile && profile.team > 2) {
-    profile.team = 0;
-    saveProfile();
-    publishMe();
-    toast('当前是双人接力模式，3/4 号位已改为观战');
-  }
-}
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
 function addLog(text) {
   const now = new Date();
   const hh = String(now.getHours()).padStart(2, '0'), mm = String(now.getMinutes()).padStart(2, '0');
   state.log.push(hh + ':' + mm + ' ' + text);
   if (state.log.length > 80) state.log = state.log.slice(-80);
 }
+function normalizeProfileSeat() {
+  if (state.mode === 'team' && profile && profile.team > 2) {
+    profile.team = 0; saveProfile(); publishMe();
+    toast('当前是双人接力模式，3/4 号位已改为观战');
+  }
+}
 
-/* ---------- 本地持久化 ---------- */
+/* ================= 存储 ================= */
 function saveRoom() {
   try { localStorage.setItem(LS_STATE, JSON.stringify({ mode: state.mode, moves: state.moves, owners: state.owners, turn: state.turn, log: state.log, ts: Date.now() })); } catch (e) {}
 }
@@ -289,9 +313,7 @@ function loadSavedState() {
   try { const d = JSON.parse(localStorage.getItem(LS_STATE) || 'null'); if (d && typeof d === 'object') return d; } catch (e) {}
   return null;
 }
-function saveProfile() {
-  try { localStorage.setItem(LS_PROFILE, JSON.stringify(profile)); } catch (e) {}
-}
+function saveProfile() { try { localStorage.setItem(LS_PROFILE, JSON.stringify(profile)); } catch (e) {} }
 function loadProfile() {
   try {
     const p = JSON.parse(localStorage.getItem(LS_PROFILE) || 'null');
@@ -300,85 +322,660 @@ function loadProfile() {
   return null;
 }
 
-/* ---------- 渲染 ---------- */
-function resizeCanvas() {
-  const size = Math.min(canvas.parentElement.clientWidth, 560);
-  if (size <= 0) return;
-  dpr = window.devicePixelRatio || 1;
-  cssSize = size;
-  canvas.width = Math.round(size * dpr);
-  canvas.height = Math.round(size * dpr);
-  canvas.style.width = size + 'px';
-  canvas.style.height = size + 'px';
-  cell = size / (N + 1);
-  margin = cell;
-  draw();
+/* ================= 3D 场景 ================= */
+const sceneEl = $('scene');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+} catch (e) {
+  $('loading').innerHTML = '<p>当前浏览器不支持 WebGL，换 Chrome / Edge 再试</p>';
+  throw e;
 }
-function drawStone(x, y, color, alpha) {
-  const cx = margin + x * cell, cy = margin + y * cell, r = cell * 0.43;
-  const g0 = (STONE[color] || STONE[1])[0], g1 = (STONE[color] || STONE[1])[1];
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.shadowColor = 'rgba(60,40,10,.35)';
-  ctx.shadowBlur = cell * 0.08;
-  ctx.shadowOffsetY = cell * 0.04;
-  const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r * 1.05);
-  g.addColorStop(0, g0); g.addColorStop(1, g1);
-  ctx.fillStyle = g;
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
-  ctx.restore();
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+sceneEl.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0b0908, 0.011);
+
+const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 120);
+const CAM_LOOK = new THREE.Vector3(0, 0, 0.9);
+const camTarget = { theta: 0, phi: 0.95, radius: 34 };
+const camCur = { theta: 0, phi: 0.95, radius: 34 };
+let userZoom = false;
+let userRotated = false;
+
+function setupLights() {
+  scene.add(new THREE.HemisphereLight(0xffe8c0, 0x120c07, 0.5));
+  const key = new THREE.DirectionalLight(0xffdfb2, 2.6);
+  key.position.set(9, 16, 7);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  const d = 11;
+  key.shadow.camera.left = -d; key.shadow.camera.right = d;
+  key.shadow.camera.top = d; key.shadow.camera.bottom = -d;
+  key.shadow.camera.near = 1; key.shadow.camera.far = 50;
+  key.shadow.bias = -0.0006;
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0x8fb4ff, 1.1);
+  rim.position.set(-12, 9, -10);
+  scene.add(rim);
+  const warm = new THREE.PointLight(0xff9b52, 90, 45, 2);
+  warm.position.set(0, 9, 7);
+  scene.add(warm);
 }
-function draw() {
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const bg = ctx.createLinearGradient(0, 0, cssSize, cssSize);
-  bg.addColorStop(0, '#e8c489'); bg.addColorStop(1, '#d9ad63');
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, cssSize, cssSize);
-  ctx.strokeStyle = '#7a5526'; ctx.lineWidth = 1;
-  for (let i = 0; i < N; i++) {
-    const p = margin + i * cell;
-    ctx.beginPath(); ctx.moveTo(margin, p); ctx.lineTo(margin + (N - 1) * cell, p); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(p, margin); ctx.lineTo(p, margin + (N - 1) * cell); ctx.stroke();
+setupLights();
+
+function makeWoodTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 1024;
+  const g = c.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 1024, 1024);
+  grd.addColorStop(0, '#c99a5b');
+  grd.addColorStop(0.5, '#b9834a');
+  grd.addColorStop(1, '#a86f3c');
+  g.fillStyle = grd; g.fillRect(0, 0, 1024, 1024);
+  for (let i = 0; i < 190; i++) {
+    g.beginPath();
+    const y = Math.random() * 1024;
+    g.moveTo(0, y);
+    for (let x = 0; x <= 1024; x += 48) {
+      g.lineTo(x, y + Math.sin(x * 0.011 + i * 0.7) * 7 + (Math.random() - 0.5) * 5);
+    }
+    g.strokeStyle = 'rgba(88,48,20,' + (0.025 + Math.random() * 0.055) + ')';
+    g.lineWidth = 0.7 + Math.random() * 2.2;
+    g.stroke();
   }
-  ctx.lineWidth = 2;
-  ctx.strokeRect(margin, margin, (N - 1) * cell, (N - 1) * cell);
-  ctx.fillStyle = '#7a5526';
+  for (let i = 0; i < 5; i++) {
+    const x = Math.random() * 1024, y = Math.random() * 1024, r = 4 + Math.random() * 14;
+    const rg = g.createRadialGradient(x, y, 0, x, y, r * 3);
+    rg.addColorStop(0, 'rgba(70,38,16,.5)');
+    rg.addColorStop(1, 'rgba(70,38,16,0)');
+    g.fillStyle = rg;
+    g.beginPath(); g.ellipse(x, y, r * 3, r * 1.1, Math.random() * Math.PI, 0, Math.PI * 2); g.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return tex;
+}
+
+function makeTable() {
+  const mat = new THREE.MeshStandardMaterial({ color: 0x1c1511, roughness: 0.9, metalness: 0.05 });
+  const table = new THREE.Mesh(new THREE.CylinderGeometry(13, 13.4, 0.7, 64), mat);
+  table.position.y = -0.95;
+  table.receiveShadow = true;
+  scene.add(table);
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(40, 64), new THREE.MeshStandardMaterial({ color: 0x0a0807, roughness: 1 }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -1.35;
+  floor.receiveShadow = true;
+  scene.add(floor);
+}
+
+function makeLabel(text, size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, 128, 128);
+  g.fillStyle = 'rgba(58,34,14,.85)';
+  g.font = '700 74px -apple-system,"PingFang SC",sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 64, 68);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.95, depthWrite: false });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
+  mesh.rotation.x = -Math.PI / 2;
+  return mesh;
+}
+
+const boardGroup = new THREE.Group();
+scene.add(boardGroup);
+
+function setupBoard() {
+  makeTable();
+  const wood = makeWoodTexture();
+  const topMat = new THREE.MeshStandardMaterial({ map: wood, roughness: 0.52, metalness: 0.03 });
+  const sideMat = new THREE.MeshStandardMaterial({ color: 0x6b4526, roughness: 0.62, metalness: 0.02 });
+  const boardMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(N * S + 1.5, 0.6, N * S + 1.5),
+    [sideMat, sideMat, topMat, sideMat, sideMat, sideMat]
+  );
+  boardMesh.position.y = -0.3;
+  boardMesh.castShadow = true;
+  boardMesh.receiveShadow = true;
+  boardGroup.add(boardMesh);
+
+  const pts = [];
+  for (let i = 0; i < N; i++) {
+    const p = (i - HALF) * S;
+    pts.push(new THREE.Vector3(p, 0.004, -HALF * S), new THREE.Vector3(p, 0.004, HALF * S));
+    pts.push(new THREE.Vector3(-HALF * S, 0.004, p), new THREE.Vector3(HALF * S, 0.004, p));
+  }
+  const grid = new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color: 0x4a2f16, transparent: true, opacity: 0.85 })
+  );
+  boardGroup.add(grid);
+
+  const starMat = new THREE.MeshBasicMaterial({ color: 0x3a2410 });
   for (const [sx, sy] of [[3,3],[11,3],[3,11],[11,11],[7,7]]) {
-    ctx.beginPath(); ctx.arc(margin + sx * cell, margin + sy * cell, cell * 0.11, 0, Math.PI * 2); ctx.fill();
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.085, 24), starMat);
+    dot.rotation.x = -Math.PI / 2;
+    dot.position.set((sx - HALF) * S, 0.006, (sy - HALF) * S);
+    boardGroup.add(dot);
   }
-  ctx.fillStyle = 'rgba(122,85,38,.75)';
-  ctx.font = Math.max(9, cell * 0.3) + 'px sans-serif';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
   for (let i = 0; i < N; i++) {
-    ctx.fillText(COLS[i], margin + i * cell, margin + (N - 1) * cell + cell * 0.5);
-    ctx.fillText(String(N - i), margin - cell * 0.5, margin + i * cell);
+    const col = makeLabel(COLS[i], 0.52);
+    col.position.set((i - HALF) * S, 0.007, HALF * S + 0.52);
+    boardGroup.add(col);
+    const row = makeLabel(String(N - i), 0.52);
+    row.position.set(-HALF * S - 0.52, 0.007, (i - HALF) * S);
+    boardGroup.add(row);
   }
-  for (let i = 0; i < state.moves.length; i++) {
-    const [x, y] = posToXY(state.moves[i]);
+}
+setupBoard();
+
+/* ---------- 棋子 ---------- */
+const stoneGeo = (() => {
+  const pts = [];
+  const steps = 18;
+  for (let i = 0; i <= steps; i++) {
+    const a = (i / steps) * Math.PI;
+    const r = 0.42 * Math.sin(a);
+    const y = 0.185 * Math.cos(a);
+    pts.push(new THREE.Vector2(r, y));
+  }
+  return new THREE.LatheGeometry(pts, 40);
+})();
+const stoneMat = {
+  1: new THREE.MeshPhysicalMaterial({ color: STONE_HEX[1], roughness: 0.24, metalness: 0.08, clearcoat: 1, clearcoatRoughness: 0.12 }),
+  2: new THREE.MeshPhysicalMaterial({ color: STONE_HEX[2], roughness: 0.3, metalness: 0.0, clearcoat: 1, clearcoatRoughness: 0.2 }),
+  3: new THREE.MeshPhysicalMaterial({ color: STONE_HEX[3], roughness: 0.26, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.15 }),
+  4: new THREE.MeshPhysicalMaterial({ color: STONE_HEX[4], roughness: 0.26, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.15 })
+};
+const STONE_Y = 0.19;
+let stoneMeshes = [];
+
+function makeStone(owner) {
+  const m = new THREE.Mesh(stoneGeo, stoneMat[owner] || stoneMat[1]);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  m.userData.owner = owner;
+  return m;
+}
+
+function syncStones() {
+  const n = state.moves.length;
+  while (stoneMeshes.length > n) {
+    const m = stoneMeshes.pop();
+    boardGroup.remove(m);
+  }
+  for (let i = 0; i < n; i++) {
     const owner = state.owners[i] || (i % 2 === 0 ? 1 : 2);
-    drawStone(x, y, owner, 1);
-    if (i === state.moves.length - 1 && !state.winLine) {
-      ctx.fillStyle = owner === 2 ? '#333' : '#fff';
-      ctx.beginPath(); ctx.arc(margin + x * cell, margin + y * cell, cell * 0.13, 0, Math.PI * 2); ctx.fill();
+    const [x, y] = posToXY(state.moves[i]);
+    if (!stoneMeshes[i]) {
+      const mesh = makeStone(owner);
+      const w = cellToWorld(x, y);
+      mesh.position.set(w.x, STONE_Y, w.z);
+      mesh.userData.drop = 0;
+      mesh.userData.startY = STONE_Y + 3.2;
+      mesh.position.y = mesh.userData.startY;
+      boardGroup.add(mesh);
+      stoneMeshes[i] = mesh;
+    } else if (stoneMeshes[i].userData.owner !== owner) {
+      stoneMeshes[i].material = stoneMat[owner] || stoneMat[1];
+      stoneMeshes[i].userData.owner = owner;
     }
-  }
-  if (state.winLine) {
-    ctx.strokeStyle = '#ff2d95'; ctx.lineWidth = 3;
-    for (const [wx, wy] of state.winLine) {
-      ctx.beginPath(); ctx.arc(margin + wx * cell, margin + wy * cell, cell * 0.47, 0, Math.PI * 2); ctx.stroke();
-    }
-  }
-  if (state.pending && !state.winner) {
-    const c = currentColor();
-    drawStone(state.pending.x, state.pending.y, c, 0.45);
-    ctx.setLineDash([4, 3]);
-    ctx.strokeStyle = c === 2 ? '#333' : '#fff';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(margin + state.pending.x * cell, margin + state.pending.y * cell, cell * 0.5, 0, Math.PI * 2); ctx.stroke();
-    ctx.setLineDash([]);
   }
 }
 
-/* ---------- UI ---------- */
+/* 最后一手标记 */
+const lastRing = new THREE.Mesh(
+  new THREE.TorusGeometry(0.48, 0.028, 8, 44),
+  new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.9 })
+);
+lastRing.rotation.x = Math.PI / 2;
+lastRing.visible = false;
+boardGroup.add(lastRing);
+
+/* 预览子 */
+const ghost = new THREE.Mesh(stoneGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.38, depthWrite: false, roughness: 0.4 }));
+ghost.visible = false;
+boardGroup.add(ghost);
+const ghostRing = new THREE.Mesh(
+  new THREE.TorusGeometry(0.5, 0.02, 8, 44),
+  new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.75 })
+);
+ghostRing.rotation.x = Math.PI / 2;
+ghostRing.visible = false;
+boardGroup.add(ghostRing);
+
+/* 悬停圈 */
+const hoverRing = new THREE.Mesh(
+  new THREE.TorusGeometry(0.44, 0.012, 6, 36),
+  new THREE.MeshBasicMaterial({ color: 0xffe6b0, transparent: true, opacity: 0.35 })
+);
+hoverRing.rotation.x = Math.PI / 2;
+hoverRing.visible = false;
+boardGroup.add(hoverRing);
+
+/* 胜利连线 */
+const winGroup = new THREE.Group();
+boardGroup.add(winGroup);
+
+function updateLastRing() {
+  if (!state.moves.length || state.winLine) { lastRing.visible = false; return; }
+  const [x, y] = posToXY(state.moves[state.moves.length - 1]);
+  const w = cellToWorld(x, y);
+  lastRing.position.set(w.x, 0.02, w.z);
+  lastRing.visible = true;
+}
+
+function updateWinLine() {
+  while (winGroup.children.length) {
+    const c = winGroup.children.pop();
+    c.geometry && c.geometry.dispose && c.geometry.dispose();
+    c.material && c.material.dispose && c.material.dispose();
+  }
+  if (!state.winLine || state.winLine.length < 2) return;
+  const points = state.winLine.map(([x, y]) => {
+    const w = cellToWorld(x, y);
+    return new THREE.Vector3(w.x, 0.72, w.z);
+  });
+  const curve = new THREE.CatmullRomCurve3(points);
+  const tube = new THREE.Mesh(
+    new THREE.TubeGeometry(curve, 48, 0.055, 8, false),
+    new THREE.MeshBasicMaterial({ color: 0xffcf5c, transparent: true, opacity: 0.95, toneMapped: false })
+  );
+  winGroup.add(tube);
+  for (const p of points) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.5, 0.035, 8, 40),
+      new THREE.MeshBasicMaterial({ color: 0xffcf5c, transparent: true, opacity: 0.95 })
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.copy(p);
+    winGroup.add(ring);
+  }
+}
+
+/* 尘埃 */
+const dust = (() => {
+  const count = 260;
+  const pos = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    pos[i * 3] = (Math.random() - 0.5) * 22;
+    pos[i * 3 + 1] = Math.random() * 8 + 0.5;
+    pos[i * 3 + 2] = (Math.random() - 0.5) * 22;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const m = new THREE.PointsMaterial({ color: 0xffd9a0, size: 0.045, transparent: true, opacity: 0.4, depthWrite: false, blending: THREE.AdditiveBlending });
+  const p = new THREE.Points(g, m);
+  scene.add(p);
+  return p;
+})();
+
+/* ================= 在场人物（随机小猫人） ================= */
+const SEAT_HEX = { 0: 0x8c7a5e, 1: 0x151515, 2: 0xefe6d4, 3: 0xb52a1f, 4: 0x1f4f9e };
+const AVATAR_RING = 11.6;
+const avatarGroup = new THREE.Group();
+scene.add(avatarGroup);
+const avatars = new Map();
+
+const SKIN_COLORS = [0xf1c9a5, 0xe6b58a, 0xc98e63, 0xa9714a, 0xffd7b8, 0xd9a06b];
+const SHIRT_COLORS = [0x6ba3d6, 0xd67b6b, 0x7fb069, 0xc9a227, 0x8e7cc3, 0x5aa9a3, 0xd98cb3, 0x9a7b5a, 0x4f7fbf];
+const PANTS_COLORS = [0x2e3440, 0x3b3f4a, 0x4a3f35, 0x2f4858, 0x5a4636, 0x30343b];
+const HAIR_COLORS = [0x2b1d14, 0x4a2f1d, 0x6b4a2a, 0xd9b382, 0x1f1f1f, 0x8a3b2a];
+
+function seedFrom(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function mulberry(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function drawNameLabel(label, name, team) {
+  const c = label.canvas, g = c.getContext('2d');
+  const w = c.width, h = c.height;
+  g.clearRect(0, 0, w, h);
+  const x = 6, y = 22, bw = w - 12, bh = h - 44, r = 26;
+  g.beginPath();
+  if (g.roundRect) g.roundRect(x, y, bw, bh, r); else g.rect(x, y, bw, bh);
+  g.fillStyle = 'rgba(14,11,8,.82)';
+  g.fill();
+  const hex = '#' + (SEAT_HEX[team] || SEAT_HEX[0]).toString(16).padStart(6, '0');
+  g.lineWidth = 5;
+  g.strokeStyle = hex;
+  g.stroke();
+  g.beginPath();
+  g.arc(x + 38, y + bh / 2, 13, 0, Math.PI * 2);
+  g.fillStyle = hex;
+  g.fill();
+  g.lineWidth = 3;
+  g.strokeStyle = 'rgba(255,255,255,.45)';
+  g.stroke();
+  g.font = '600 44px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  g.textAlign = 'left';
+  g.textBaseline = 'middle';
+  g.fillStyle = '#f7ead2';
+  g.fillText(name, x + 64, y + bh / 2 + 2, bw - 82);
+  label.tex.needsUpdate = true;
+}
+function makeNameLabel(name, team) {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 128;
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(2.7, 0.675, 1);
+  sprite.renderOrder = 30;
+  const label = { canvas: c, tex, sprite };
+  drawNameLabel(label, name, team);
+  return label;
+}
+
+function createAvatar(peer) {
+  const rng = mulberry(seedFrom(peer.id));
+  const skin = SKIN_COLORS[Math.floor(rng() * SKIN_COLORS.length)];
+  const shirt = SHIRT_COLORS[Math.floor(rng() * SHIRT_COLORS.length)];
+  const pants = PANTS_COLORS[Math.floor(rng() * PANTS_COLORS.length)];
+  const hair = HAIR_COLORS[Math.floor(rng() * HAIR_COLORS.length)];
+  const skinM = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.8, flatShading: true });
+  const shirtM = new THREE.MeshStandardMaterial({ color: shirt, roughness: 0.85, flatShading: true });
+  const pantsM = new THREE.MeshStandardMaterial({ color: pants, roughness: 0.9, flatShading: true });
+  const hairM = new THREE.MeshStandardMaterial({ color: hair, roughness: 0.9, flatShading: true });
+
+  const g = new THREE.Group();
+  for (const sx of [-0.14, 0.14]) {
+    const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.36, 3, 6), pantsM);
+    leg.position.set(sx, 0.3, 0);
+    g.add(leg);
+  }
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 0.38, 4, 8), shirtM);
+  body.position.y = 0.93;
+  g.add(body);
+  for (const sx of [-1, 1]) {
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.072, 0.32, 3, 6), shirtM);
+    arm.position.set(sx * 0.33, 0.95, 0);
+    arm.rotation.z = sx * 0.22;
+    g.add(arm);
+  }
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 10), skinM);
+  head.position.y = 1.49;
+  g.add(head);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.285, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.58), hairM);
+  cap.position.y = 1.5;
+  g.add(cap);
+  for (const sx of [-1, 1]) {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.22, 5), hairM);
+    ear.position.set(sx * 0.155, 1.77, 0);
+    ear.rotation.z = -sx * 0.22;
+    g.add(ear);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.032, 6, 6), new THREE.MeshBasicMaterial({ color: 0x111111 }));
+    eye.position.set(sx * 0.1, 1.51, 0.245);
+    g.add(eye);
+  }
+  const tail = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.05, 5, 12, Math.PI * 1.3), hairM);
+  tail.position.set(0, 0.72, -0.28);
+  tail.rotation.y = Math.PI / 2;
+  tail.rotation.z = 0.55;
+  g.add(tail);
+
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: SEAT_HEX[peer.team] || SEAT_HEX[0],
+    transparent: true, opacity: 0.8, side: THREE.DoubleSide
+  });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.38, 0.49, 24), ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.006;
+  g.add(ring);
+
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  const scale = 0.85 + rng() * 0.22;
+  g.scale.setScalar(scale);
+  const label = makeNameLabel(peer.name, peer.team);
+  return { group: g, tail, scale, label, name: peer.name, team: peer.team, phase: rng() * Math.PI * 2, baseY: -0.6 };
+}
+
+function seatTarget(team, index, count) {
+  const deg = { 1: 45, 2: 225, 3: 315, 4: 135 }[team];
+  const a = deg * Math.PI / 180;
+  const off = (index - (count - 1) / 2) * 1.15;
+  return {
+    x: Math.sin(a) * AVATAR_RING + Math.cos(a) * off,
+    z: Math.cos(a) * AVATAR_RING - Math.sin(a) * off
+  };
+}
+function watcherTarget(index, count) {
+  const spacing = Math.min(1.8, 9.5 / Math.max(1, count - 1));
+  return { x: (index - (count - 1) / 2) * spacing, z: -12.1 };
+}
+
+function removeAvatar(id) {
+  const av = avatars.get(id);
+  if (!av) return;
+  avatarGroup.remove(av.group);
+  scene.remove(av.label.sprite);
+  av.label.tex.dispose();
+  av.label.sprite.material.dispose();
+  avatars.delete(id);
+}
+
+function syncAvatars() {
+  const all = [...peers.values()];
+  const seats = all.filter(p => p.team >= 1 && p.team <= 4);
+  const watchers = all.filter(p => p.team === 0).sort((a, b) => a.id.localeCompare(b.id));
+  const alive = new Set();
+  const place = (p, t) => {
+    alive.add(p.id);
+    let av = avatars.get(p.id);
+    if (av && av.team !== p.team) { removeAvatar(p.id); av = null; }
+    if (!av) {
+      av = createAvatar(p);
+      avatars.set(p.id, av);
+      avatarGroup.add(av.group);
+      scene.add(av.label.sprite);
+    } else if (av.name !== p.name) {
+      av.name = p.name;
+      drawNameLabel(av.label, p.name, p.team);
+    }
+    av.group.position.set(t.x, av.baseY, t.z);
+    av.group.rotation.y = Math.atan2(-t.x, -t.z);
+    av.label.sprite.position.set(t.x, av.baseY + 2.02 * av.scale + 0.22, t.z);
+  };
+  const byTeam = new Map();
+  for (const p of seats) {
+    if (!byTeam.has(p.team)) byTeam.set(p.team, []);
+    byTeam.get(p.team).push(p);
+  }
+  const teams = [...byTeam.keys()].sort((a, b) => a - b);
+  const narrow = window.innerWidth / window.innerHeight < 0.85;
+  teams.forEach((team, gi) => {
+    const arr = byTeam.get(team);
+    arr.forEach((p, i) => {
+      const t = narrow
+        ? { x: (gi - (teams.length - 1) / 2) * 3.2 + (i - (arr.length - 1) / 2) * 1.05, z: -9.6 }
+        : seatTarget(team, i, arr.length);
+      place(p, t);
+    });
+  });
+  watchers.forEach((p, i) => {
+    const t = narrow
+      ? { x: (i - (watchers.length - 1) / 2) * Math.min(1.6, 8 / Math.max(1, watchers.length - 1)), z: -11.2 }
+      : watcherTarget(i, watchers.length);
+    place(p, t);
+  });
+  for (const id of [...avatars.keys()]) if (!alive.has(id)) removeAvatar(id);
+}
+
+/* ================= 相机/输入 ================= */
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  const aspect = w / h;
+  camera.aspect = aspect;
+  camera.fov = aspect < 0.85 ? 58 : 42;
+  camera.updateProjectionMatrix();
+  if (!userRotated) camTarget.phi = aspect < 0.85 ? 0.5 : 0.95;
+  if (!userZoom) camTarget.radius = aspect < 0.85 ? 46 : 34;
+}
+window.addEventListener('resize', resize);
+resize();
+
+function updateCamera(dt) {
+  const k = 1 - Math.pow(0.0001, dt);
+  camCur.theta += (camTarget.theta - camCur.theta) * k;
+  camCur.phi += (camTarget.phi - camCur.phi) * k;
+  camCur.radius += (camTarget.radius - camCur.radius) * k;
+  const r = camCur.radius, phi = camCur.phi, th = camCur.theta;
+  camera.position.set(r * Math.sin(phi) * Math.sin(th), r * Math.cos(phi), r * Math.sin(phi) * Math.cos(th));
+  camera.lookAt(CAM_LOOK);
+}
+
+const raycaster = new THREE.Raycaster();
+const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const ndc = new THREE.Vector2();
+
+function pick(clientX, clientY) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(ndc, camera);
+  const hit = new THREE.Vector3();
+  if (!raycaster.ray.intersectPlane(plane, hit)) return null;
+  const gx = Math.round(hit.x / S + HALF);
+  const gy = Math.round(hit.z / S + HALF);
+  if (gx < 0 || gx >= N || gy < 0 || gy >= N) return null;
+  const w = cellToWorld(gx, gy);
+  if (Math.hypot(hit.x - w.x, hit.z - w.z) > S * 0.5) return null;
+  return { x: gx, y: gy };
+}
+
+let hoverCell = null;
+const pointerMap = new Map();
+let drag = null;
+let pinchDist = 0;
+
+function setGhost() {
+  const p = state.pending;
+  if (p && !state.winner) {
+    const w = cellToWorld(p.x, p.y);
+    ghost.position.set(w.x, STONE_Y, w.z);
+    ghost.material.color.setHex(STONE_HEX[currentColor()] || 0xffffff);
+    ghost.material.opacity = 0.36;
+    ghost.visible = true;
+    ghostRing.position.set(w.x, 0.03, w.z);
+    ghostRing.visible = true;
+  } else {
+    ghost.visible = false;
+    ghostRing.visible = false;
+  }
+  if (hoverCell && !state.pending && !state.winner && board[hoverCell.y] && board[hoverCell.y][hoverCell.x] === 0) {
+    const w = cellToWorld(hoverCell.x, hoverCell.y);
+    hoverRing.position.set(w.x, 0.02, w.z);
+    hoverRing.visible = true;
+  } else {
+    hoverRing.visible = false;
+  }
+}
+
+function activateCell(x, y) {
+  if (!profile) { showEntry(false); return; }
+  if (state.winner) { toast('本局已结束，点「新局」再开一盘'); return; }
+  if (!window.mqtt) { toast('组件还在加载，稍等几秒…'); return; }
+  if (!net.connected) { toast('还没连上房间，稍等几秒…'); return; }
+  if (profile.team === 0) { toast('观战中，点「名字/座位」可加入一方'); return; }
+  if (profile.team !== currentColor()) { toast('现在轮到' + seatName(currentColor()) + '落子'); return; }
+  if (board[y][x] !== 0) {
+    if (state.pending) { state.pending = null; updateAll(); }
+    return;
+  }
+  if (state.pending && state.pending.x === x && state.pending.y === y) {
+    doPlace(x, y);
+  } else {
+    state.pending = { x, y };
+    updateAll();
+  }
+}
+
+function onPointerDown(e) {
+  renderer.domElement.setPointerCapture && renderer.domElement.setPointerCapture(e.pointerId);
+  pointerMap.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointerMap.size === 1) {
+    drag = { x: e.clientX, y: e.clientY, moved: false };
+  } else if (pointerMap.size === 2) {
+    const [a, b] = [...pointerMap.values()];
+    pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+  }
+}
+function onPointerMove(e) {
+  if (!pointerMap.has(e.pointerId)) {
+    const cell = pick(e.clientX, e.clientY);
+    hoverCell = cell;
+    setGhost();
+    return;
+  }
+  pointerMap.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointerMap.size === 2) {
+    const [a, b] = [...pointerMap.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    if (pinchDist > 0) {
+      camTarget.radius = Math.max(14, Math.min(42, camTarget.radius * (pinchDist / Math.max(1, d))));
+      userZoom = true;
+    }
+    pinchDist = d;
+    if (drag) drag.moved = true;
+    return;
+  }
+  if (drag) {
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) > 0) {
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 5) drag.moved = true;
+      userRotated = true;
+      camTarget.theta -= dx * 0.006;
+      camTarget.phi = Math.max(0.28, Math.min(1.32, camTarget.phi - dy * 0.005));
+      drag.x = e.clientX; drag.y = e.clientY;
+    }
+  }
+}
+function onPointerUp(e) {
+  pointerMap.delete(e.pointerId);
+  if (pointerMap.size < 2) pinchDist = 0;
+  if (pointerMap.size === 0) {
+    if (drag && !drag.moved) {
+      const cell = pick(e.clientX, e.clientY);
+      if (cell) activateCell(cell.x, cell.y);
+    }
+    drag = null;
+  }
+}
+renderer.domElement.addEventListener('pointerdown', onPointerDown);
+renderer.domElement.addEventListener('pointermove', onPointerMove);
+renderer.domElement.addEventListener('pointerup', onPointerUp);
+renderer.domElement.addEventListener('pointercancel', onPointerUp);
+renderer.domElement.addEventListener('wheel', function (e) {
+  e.preventDefault();
+  camTarget.radius = Math.max(14, Math.min(42, camTarget.radius * Math.exp(e.deltaY * 0.0011)));
+  userZoom = true;
+}, { passive: false });
+
+/* ================= UI ================= */
 let toastTimer = null;
 function toast(msg) {
   const t = $('toast');
@@ -391,14 +988,15 @@ function toast(msg) {
 function updateNetUI() {
   const b = $('netBadge');
   if (!window.mqtt) {
-    b.className = net.scriptFailed ? 'bad' : 'warn';
+    b.className = 'badge ' + (net.scriptFailed ? 'bad' : 'warn');
     b.textContent = net.scriptFailed ? '组件加载失败，重试中…' : '加载中…';
     return;
   }
-  if (net.connected) { b.className = 'ok'; b.textContent = '🟢 已连接 · ' + peers.size + ' 人在线'; }
-  else if (net.allFailed) { b.className = 'bad'; b.textContent = '🔴 服务器暂不可达，重试中…'; }
-  else { b.className = 'warn'; b.textContent = '🟡 连接中…'; }
+  if (net.connected) { b.className = 'badge ok'; b.textContent = '🟢 已连接 · ' + peers.size + ' 人'; }
+  else if (net.allFailed) { b.className = 'badge bad'; b.textContent = '🔴 服务器不可达'; }
+  else { b.className = 'badge warn'; b.textContent = '🟡 连接中…'; }
 }
+
 function setStatus() {
   const chip = $('myTeamChip');
   if (!profile) { chip.className = ''; chip.textContent = '未加入'; }
@@ -426,13 +1024,11 @@ function setStatus() {
   info += ' · 在线 ' + peers.size + ' 人';
   $('moveInfo').textContent = info;
 }
+
 function renderRoster() {
   const rows = [];
-  if (isFfa()) {
-    rows.push(['⚫ 黑方', 1], ['⚪ 白方', 2], ['🔴 红方', 3], ['🔵 蓝方', 4]);
-  } else {
-    rows.push(['⚫ 黑方', 1], ['⚪ 白方', 2]);
-  }
+  if (isFfa()) rows.push(['⚫ 黑方', 1], ['⚪ 白方', 2], ['🔴 红方', 3], ['🔵 蓝方', 4]);
+  else rows.push(['⚫ 黑方', 1], ['⚪ 白方', 2]);
   rows.push(['👀 观战', 0]);
   $('rosterRows').innerHTML = rows.map(([label, seat]) => {
     const arr = [...peers.values()].filter(r => r.team === seat);
@@ -444,30 +1040,35 @@ function renderRoster() {
 }
 function renderLog() {
   const el = $('log');
-  el.innerHTML = state.log.map(s => '<div>' + escapeHtml(s) + '</div>').join('') || '<div style="color:#b3a488">暂无动态</div>';
+  el.innerHTML = state.log.map(s => '<div>' + escapeHtml(s) + '</div>').join('') || '<div style="color:#6f604b">暂无动态</div>';
   el.scrollTop = el.scrollHeight;
 }
+
 let lastRosterJson = '', lastLogJson = '', entrySig = null;
 function updateAll() {
-  draw();
   updateNetUI();
   setStatus();
   const mb = $('modeBadge');
   mb.textContent = MODE_NAME[state.mode] || MODE_NAME.team;
-  mb.className = state.mode === 'ffa' ? 'ffa' : '';
+  mb.className = 'badge' + (state.mode === 'ffa' ? ' ffa' : '');
   const rj = JSON.stringify([state.mode, [...peers.values()]]);
   const lj = JSON.stringify(state.log);
   if (rj !== lastRosterJson) { lastRosterJson = rj; renderRoster(); }
   if (lj !== lastLogJson) { lastLogJson = lj; renderLog(); }
+  syncStones();
+  updateLastRing();
+  updateWinLine();
+  setGhost();
+  syncAvatars();
   maybeRenderEntry();
 }
 
-/* ---------- 入场 ---------- */
+/* ================= 入场 ================= */
 function sdotStyle(s) {
-  if (s === 1) return 'radial-gradient(circle at 35% 30%,#666,#111)';
+  if (s === 1) return 'radial-gradient(circle at 35% 30%,#777,#0b0b0b)';
   if (s === 2) return 'radial-gradient(circle at 35% 30%,#fff,#cfc9bd)';
-  if (s === 3) return 'radial-gradient(circle at 35% 30%,#ff8a7a,#b71c1c)';
-  if (s === 4) return 'radial-gradient(circle at 35% 30%,#7cc0ff,#0d47a1)';
+  if (s === 3) return 'radial-gradient(circle at 35% 30%,#ff8a7a,#a4170e)';
+  if (s === 4) return 'radial-gradient(circle at 35% 30%,#7cc0ff,#123c7d)';
   return '#ddd';
 }
 function renderEntryOptions() {
@@ -482,9 +1083,7 @@ function renderEntryOptions() {
     const label = isFfa() ? (s + '号位 · ' + seatName(s)) : (s === 1 ? '加入黑方（先手）' : '加入白方（后手）');
     html += '<button class="side-btn" data-seat="' + s + '"' + (taken ? ' disabled' : '') + '>'
          + '<span class="sdot" style="background:' + sdotStyle(s) + '"></span>'
-         + escapeHtml(label)
-         + (mine ? '（当前）' : '')
-         + (taken ? '（' + escapeHtml(occ.name) + '）' : '')
+         + escapeHtml(label) + (mine ? '（当前）' : '') + (taken ? '（' + escapeHtml(occ.name) + '）' : '')
          + '</button>';
   }
   html += '<button class="side-btn" data-seat="0"><span class="sdot" style="background:#ddd"></span>👀 观战（之后可换）</button>';
@@ -527,11 +1126,8 @@ function submitEntry(team) {
   updateAll();
 }
 
-/* ---------- 网络：MQTT 服务器中转 ---------- */
-function decodeJson(payload) {
-  try { return JSON.parse(new TextDecoder().decode(payload)); } catch (e) { return null; }
-}
-
+/* ================= 网络（与 2D 版同一协议） ================= */
+function decodeJson(payload) { try { return JSON.parse(new TextDecoder().decode(payload)); } catch (e) { return null; } }
 function liveHostId() {
   if (state.hostId && peers.has(state.hostId)) return state.hostId;
   if (!peers.size) return null;
@@ -541,13 +1137,13 @@ function isHost() { return net.connected && peers.has(net.id) && liveHostId() ==
 
 function ensureNet() {
   if (net.started) return;
-  if (!window.mqtt) return;   // 脚本未就位时不锁定，等 waitMqtt 轮询到再进来
+  if (!window.mqtt) return;
   net.started = true;
   net.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   connectBroker(0);
-  setInterval(publishMe, 10000);   // 定期刷新在线状态（保留消息）
-  setInterval(gcPeers, 15000);     // 清理失联玩家
-  setInterval(() => { if (isHost() && Date.now() - lastStateAt > 25000) publishState(); }, 10000);  // 房主心跳
+  setInterval(publishMe, 10000);
+  setInterval(gcPeers, 15000);
+  setInterval(() => { if (isHost() && Date.now() - lastStateAt > 25000) publishState(); }, 10000);
   setTimeout(() => {
     if (!net.hintShown && !net.connected) {
       net.hintShown = true;
@@ -559,21 +1155,15 @@ function ensureNet() {
 function connectBroker(idx) {
   if (!window.mqtt) return;
   if (idx >= BROKERS.length) {
-    net.connected = false;
-    net.allFailed = true;
-    updateAll();
-    setTimeout(() => connectBroker(0), 15000);   // 全部失败，稍后从头重试
+    net.connected = false; net.allFailed = true; updateAll();
+    setTimeout(() => connectBroker(0), 15000);
     return;
   }
   let c;
   try {
     c = mqtt.connect(BROKERS[idx], {
-      clientId: 'wzq_' + net.id,
-      keepalive: 20,
-      clean: true,
-      reconnectPeriod: 0,          // 重连/换服务器由自己管理
-      connectTimeout: 8000,
-      will: { topic: whoTopic(net.id), payload: '', qos: 1, retain: true }   // 掉线遗嘱：自动清掉在线状态
+      clientId: 'wzq3d_' + net.id, keepalive: 20, clean: true, reconnectPeriod: 0, connectTimeout: 8000,
+      will: { topic: whoTopic(net.id), payload: '', qos: 1, retain: true }
     });
   } catch (e) { setTimeout(() => connectBroker(idx + 1), 200); return; }
   net.client = c;
@@ -587,7 +1177,6 @@ function connectBroker(idx) {
     try { c.end(true); } catch (e) {}
     if (net.client === c) { net.client = null; net.connected = false; }
     updateAll();
-    // 连上过就优先重试同一台，否则换下一家
     setTimeout(() => connectBroker(everConnected ? idx : idx + 1), everConnected ? 3000 : 300);
   };
   c.on('error', onFail);
@@ -599,11 +1188,10 @@ function connectBroker(idx) {
     net.connectedAt = Date.now();
     net.allFailed = false;
     c.subscribe(ROOM_KEY + '/#', { qos: 1 });
-    // 保留消息可能被上一次连接的遗嘱清掉，重连后多补发几次在线状态
-    setTimeout(publishMe, 400);        // 稍等订阅生效，自己也能收到自己的在线状态
+    setTimeout(publishMe, 400);
     setTimeout(publishMe, 1600);
     setTimeout(publishMe, 4200);
-    setTimeout(checkHostChange, 2500); // 若房间没人，自己成为房主并建房
+    setTimeout(checkHostChange, 2500);
     updateAll();
   });
   c.on('message', onMessage);
@@ -617,8 +1205,8 @@ function onMessage(topic, payload) {
 }
 
 function onWho(id, payload) {
-  const quiet = Date.now() - net.connectedAt < 3000;   // 刚连上时的保留消息洪峰，不刷动态
-  if (payload.length === 0) {   // 空消息 = 离开（主动退出或掉线遗嘱）
+  const quiet = Date.now() - net.connectedAt < 3000;
+  if (payload.length === 0) {
     const gone = peers.get(id);
     if (gone) {
       peers.delete(id);
@@ -632,7 +1220,7 @@ function onWho(id, payload) {
   if (!d) return;
   const name = sanitizeName(d.name) || '无名群友';
   let team = [0, 1, 2, 3, 4].includes(d.team) ? d.team : 0;
-  if (!isFfa() && team > 2) team = 0;   // 双人接力里不存在 3/4 号位
+  if (!isFfa() && team > 2) team = 0;
   const old = peers.get(id);
   peers.set(id, { id, name, team, ts: Date.now() });
   checkHostChange();
@@ -647,17 +1235,13 @@ function checkHostChange() {
   const host = isHost();
   if (host && !net.wasHost) {
     if (state.seq === 0) {
-      // 全新房间：稍等片刻，确认没有旧棋局、也没有更早进来的人
       if (Date.now() - net.connectedAt < 3000) { setTimeout(checkHostChange, 3000); return; }
       state.mode = 'team';
       state.moves = []; state.owners = []; state.log = []; state.pending = null; state.winner = 0; state.winLine = null; state.turn = 1;
-      rebuild();
-      normalizeProfileSeat();
+      rebuild(); normalizeProfileSeat();
       addLog('房间已创建，把链接发到群里吧');
       publishState();
     } else {
-      // 保留消息的到达顺序不固定：可能先收到棋局、后收到房主的在线状态。
-      // 刚连接的头几秒先别急着接管，否则新进来的人会把房主挤掉。
       if (state.hostId && !peers.has(state.hostId) && Date.now() - net.connectedAt < 6000) {
         setTimeout(checkHostChange, 2000);
         return;
@@ -675,7 +1259,7 @@ function onState(payload) {
   const mode = d.mode === 'ffa' ? 'ffa' : 'team';
   const san = sanitizeState(d.moves, d.owners, mode);
   if (!san || !Number.isInteger(d.seq) || d.seq < state.seq) return;
-  if (d.host === net.id) { lastStateAt = Date.now(); net.wasHost = true; return; }   // 自己发布的状态回显
+  if (d.host === net.id) { lastStateAt = Date.now(); net.wasHost = true; return; }
   const oldMode = state.mode;
   const oldPending = state.pending;
   state.seq = d.seq;
@@ -688,18 +1272,18 @@ function onState(payload) {
   rebuild(); recomputeWinner();
   state.pending = null;
   if (oldPending && !state.winner && profile && profile.team === currentColor() && board[oldPending.y] && board[oldPending.y][oldPending.x] === 0) {
-    state.pending = oldPending;   // 房主心跳/别人进出不应清掉我正在选的子
+    state.pending = oldPending;
   }
   if (oldMode !== mode) {
-    normalizeProfileSeat();      // 切回团队模式时 3/4 号位转观战
-    if (profile) publishMe();    // 乱战开启后，3/4 号位的在线状态要重新广播
+    normalizeProfileSeat();
+    if (profile) publishMe();
   }
   checkHostChange();
   saveRoom(); updateAll();
 }
 
 function onEvt(payload) {
-  if (!isHost()) return;   // 只有房主处理玩家动作
+  if (!isHost()) return;
   const d = decodeJson(payload);
   if (!d || typeof d.from !== 'string') return;
   if (d.k === 'move' && Number.isInteger(d.pos)) hostApplyMove(d.from, d.pos);
@@ -713,7 +1297,6 @@ function sendEvt(o) {
   try { net.client.publish(T_EVT, JSON.stringify(Object.assign({ from: net.id }, o)), { qos: 1 }); return true; }
   catch (e) { return false; }
 }
-
 function publishMe() {
   if (!net.client || !net.connected || !profile) return;
   try { net.client.publish(whoTopic(net.id), JSON.stringify({ name: profile.name, team: profile.team }), { qos: 1, retain: true }); } catch (e) {}
@@ -721,13 +1304,10 @@ function publishMe() {
 function announceLeave() {
   try { if (net.client && net.connected) net.client.publish(whoTopic(net.id), '', { qos: 1, retain: true }); } catch (e) {}
 }
-
 function gcPeers() {
   const now = Date.now();
   const gone = [];
-  peers.forEach((r, id) => {
-    if (id !== net.id && now - r.ts > 50000) { peers.delete(id); gone.push(r); }
-  });
+  peers.forEach((r, id) => { if (id !== net.id && now - r.ts > 50000) { peers.delete(id); gone.push(r); } });
   if (gone.length) {
     checkHostChange();
     if (isHost()) { gone.forEach(r => addLog('「' + r.name + '」离开')); publishState(); }
@@ -735,7 +1315,6 @@ function gcPeers() {
   }
 }
 
-/* ---------- 房主逻辑 ---------- */
 function hostApplyMove(key, pos) {
   normalizeTurn();
   const r = peers.get(key);
@@ -800,7 +1379,6 @@ function publishState() {
   saveRoom(); updateAll();
 }
 
-/* 轮询等 mqtt 脚本就绪后再启动网络；之后即使失败也继续重试，脚本一到就能自动连接 */
 function waitMqtt(attempt) {
   if (window.mqtt) {
     net.scriptFailed = false;
@@ -816,42 +1394,16 @@ function waitMqtt(attempt) {
   setTimeout(() => waitMqtt(attempt + 1), attempt > 20 ? 2000 : 500);
 }
 
-/* ---------- 交互 ---------- */
-canvas.addEventListener('pointerdown', function (e) {
-  e.preventDefault();
-  if (!profile) { showEntry(false); return; }
-  if (state.winner) { toast('本局已结束，点「新局」再开一盘'); return; }
-  if (!window.mqtt) { toast('组件还在加载，稍等几秒…'); return; }
-  if (!net.connected) { toast('还没连上房间，稍等几秒…'); return; }
-  if (profile.team === 0) { toast('观战中，点「名字/座位」可加入一方'); return; }
-  if (profile.team !== currentColor()) { toast('现在轮到' + seatName(currentColor()) + '落子'); return; }
-  const rect = canvas.getBoundingClientRect();
-  const px = e.clientX - rect.left, py = e.clientY - rect.top;
-  const gx = Math.round((px - margin) / cell), gy = Math.round((py - margin) / cell);
-  if (gx < 0 || gx >= N || gy < 0 || gy >= N) return;
-  if (Math.hypot(px - (margin + gx * cell), py - (margin + gy * cell)) > cell * 0.48) return;
-  if (board[gy][gx] !== 0) {
-    if (state.pending) { state.pending = null; draw(); setStatus(); }
-    return;
-  }
-  if (state.pending && state.pending.x === gx && state.pending.y === gy) {
-    doPlace(gx, gy);
-  } else {
-    state.pending = { x: gx, y: gy };
-    draw(); setStatus();
-  }
-});
-
+/* ================= 操作 ================= */
 function doPlace(x, y) {
   const pos = y * N + x;
   if (isHost()) { hostApplyMove(net.id, pos); return; }
   if (!net.connected) { toast('还没连上房间'); return; }
-  // 先本地落子（乐观更新），房主确认后以广播为准
   state.moves.push(pos);
   state.owners.push(profile.team);
   state.pending = null;
   rebuild(); recomputeWinner();
-  draw(); setStatus();
+  updateAll();
   if (!sendEvt({ k: 'move', pos })) toast('还没连上房间');
 }
 
@@ -865,13 +1417,11 @@ $('btnUndo').addEventListener('click', function () {
   if (isHost()) hostApplyUndo(net.id);
   else if (!sendEvt({ k: 'undo' })) toast('还没连上房间');
 });
-
 $('btnNew').addEventListener('click', function () {
   if (!confirm('发起新的一局？棋盘清空，' + (isFfa() ? '按座位顺序先手' : '黑方先行') + '。')) return;
   if (isHost()) hostApplyReset(net.id);
   else if (!sendEvt({ k: 'reset' })) toast('还没连上房间');
 });
-
 $('btnMode').addEventListener('click', function () {
   if (!net.connected) { toast('还没连上房间'); return; }
   if (!peers.size) { toast('正在进入房间，稍等一秒再试'); return; }
@@ -880,9 +1430,9 @@ $('btnMode').addEventListener('click', function () {
   if (isHost()) hostApplyMode(net.id, next);
   else if (!sendEvt({ k: 'mode', mode: next })) toast('还没连上房间');
 });
-
 $('btnProfile').addEventListener('click', () => showEntry(true));
-
+$('btnPanel').addEventListener('click', () => $('panel').classList.toggle('open'));
+$('panelClose').addEventListener('click', () => $('panel').classList.remove('open'));
 $('seatList').addEventListener('click', function (e) {
   const b = e.target.closest('[data-seat]');
   if (!b || b.disabled) return;
@@ -890,12 +1440,69 @@ $('seatList').addEventListener('click', function (e) {
 });
 $('entryCancel').addEventListener('click', () => $('entry').classList.add('hidden'));
 
-/* ---------- 启动 ---------- */
-window.addEventListener('resize', resizeCanvas);
+/* ================= 启动/渲染循环 ================= */
 window.addEventListener('pagehide', announceLeave);
 window.addEventListener('beforeunload', announceLeave);
-(function init() {
-  resizeCanvas();
+
+let lastT = performance.now();
+let firstFrame = true;
+function animate(now) {
+  requestAnimationFrame(animate);
+  const dt = Math.min(0.05, Math.max(0.001, (now - lastT) / 1000));
+  lastT = now;
+  updateCamera(dt);
+  for (const m of stoneMeshes) {
+    const ud = m.userData;
+    if (ud.drop !== undefined && ud.drop < 1) {
+      ud.drop = Math.min(1, ud.drop + dt * 2.6);
+      const e = 1 - Math.pow(1 - ud.drop, 3);
+      m.position.y = ud.startY + (STONE_Y - ud.startY) * e;
+      const s = 0.7 + 0.3 * e;
+      m.scale.set(s, s, s);
+      if (ud.drop >= 1) m.position.y = STONE_Y;
+    }
+  }
+  const pulse = 0.5 + 0.5 * Math.sin(now / 380);
+  lastRing.material.opacity = 0.55 + 0.35 * pulse;
+  lastRing.scale.setScalar(1 + 0.04 * pulse);
+  ghostRing.material.opacity = 0.45 + 0.3 * pulse;
+  if (winGroup.children.length) {
+    for (const c of winGroup.children) {
+      if (c.material) c.material.opacity = 0.65 + 0.3 * pulse;
+    }
+  }
+  dust.rotation.y += dt * 0.02;
+  dust.position.y = Math.sin(now / 4000) * 0.3;
+  for (const av of avatars.values()) {
+    const bob = Math.sin(now / 650 + av.phase) * 0.025;
+    av.group.position.y = av.baseY + bob;
+    av.group.rotation.z = Math.sin(now / 900 + av.phase) * 0.015;
+    av.label.sprite.position.y = av.baseY + 2.02 * av.scale + 0.22 + bob;
+    if (av.tail) av.tail.rotation.z = 0.55 + Math.sin(now / 480 + av.phase) * 0.22;
+  }
+  renderer.render(scene, camera);
+  if (firstFrame) {
+    firstFrame = false;
+    $('loading').classList.add('hide');
+    if (new URLSearchParams(location.search).has('test')) exposeTest();
+  }
+}
+
+function exposeTest() {
+  window.__wzq3d = {
+    state, peers, net, camera, renderer, scene, updateAll, avatars,
+    getProfile: () => profile,
+    activateCell,
+    stoneCount: () => boardGroup.children.filter(o => o.geometry === stoneGeo && o !== ghost).length,
+    screenPoint: (x, y) => {
+      const w = cellToWorld(x, y);
+      const v = w.clone().project(camera);
+      return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight };
+    }
+  };
+}
+
+function initGame() {
   profile = loadProfile();
   const saved = loadSavedState();
   if (saved) {
@@ -909,8 +1516,9 @@ window.addEventListener('beforeunload', announceLeave);
   if (!profile) showEntry(false);
   waitMqtt(0);
   updateAll();
-})();
-})();
+  requestAnimationFrame(animate);
+}
+initGame();
 </script>
 </body>
 </html>
