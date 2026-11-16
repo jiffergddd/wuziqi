@@ -324,6 +324,7 @@ function loadProfile() {
 
 /* ================= 3D 场景 ================= */
 const sceneEl = $('scene');
+const IS_SMALL = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || Math.min(window.innerWidth, window.innerHeight) < 700;
 let renderer;
 try {
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
@@ -331,9 +332,11 @@ try {
   $('loading').innerHTML = '<p>当前浏览器不支持 WebGL，换 Chrome / Edge 再试</p>';
   throw e;
 }
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_SMALL ? 1.75 : 2));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = IS_SMALL ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = false;
+renderer.shadowMap.needsUpdate = true;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.08;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -354,7 +357,7 @@ function setupLights() {
   const key = new THREE.DirectionalLight(0xffdfb2, 2.6);
   key.position.set(9, 16, 7);
   key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.mapSize.set(IS_SMALL ? 1024 : 2048, IS_SMALL ? 1024 : 2048);
   const d = 11;
   key.shadow.camera.left = -d; key.shadow.camera.right = d;
   key.shadow.camera.top = d; key.shadow.camera.bottom = -d;
@@ -494,46 +497,48 @@ const stoneGeo = (() => {
   }
   return new THREE.LatheGeometry(pts, 40);
 })();
-const stoneMat = {
-  1: new THREE.MeshPhysicalMaterial({ color: STONE_HEX[1], roughness: 0.24, metalness: 0.08, clearcoat: 1, clearcoatRoughness: 0.12 }),
-  2: new THREE.MeshPhysicalMaterial({ color: STONE_HEX[2], roughness: 0.3, metalness: 0.0, clearcoat: 1, clearcoatRoughness: 0.2 }),
-  3: new THREE.MeshPhysicalMaterial({ color: STONE_HEX[3], roughness: 0.26, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.15 }),
-  4: new THREE.MeshPhysicalMaterial({ color: STONE_HEX[4], roughness: 0.26, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.15 })
-};
 const STONE_Y = 0.19;
-let stoneMeshes = [];
+const MAX_STONES = 225;
+const stoneMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.27, metalness: 0.06, clearcoat: 1, clearcoatRoughness: 0.15 });
+const stones = new THREE.InstancedMesh(stoneGeo, stoneMat, MAX_STONES);
+stones.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+stones.castShadow = true;
+stones.receiveShadow = true;
+stones.frustumCulled = false;
+stones.count = 0;
+boardGroup.add(stones);
+const stoneAnim = Array.from({ length: MAX_STONES }, () => ({ drop: 1, startY: STONE_Y }));
+const stoneDummy = new THREE.Object3D();
+const stoneColor = new THREE.Color();
 
-function makeStone(owner) {
-  const m = new THREE.Mesh(stoneGeo, stoneMat[owner] || stoneMat[1]);
-  m.castShadow = true;
-  m.receiveShadow = true;
-  m.userData.owner = owner;
-  return m;
+function writeStone(i, owner, x, y, drop) {
+  const a = stoneAnim[i];
+  const e = 1 - Math.pow(1 - Math.min(1, drop), 3);
+  const py = drop < 1 ? a.startY + (STONE_Y - a.startY) * e : STONE_Y;
+  const s = drop < 1 ? 0.7 + 0.3 * e : 1;
+  const w = cellToWorld(x, y);
+  stoneDummy.position.set(w.x, py, w.z);
+  stoneDummy.scale.set(s, s, s);
+  stoneDummy.rotation.set(0, 0, 0);
+  stoneDummy.updateMatrix();
+  stones.setMatrixAt(i, stoneDummy.matrix);
+  stoneColor.setHex(STONE_HEX[owner] || STONE_HEX[1]);
+  stones.setColorAt(i, stoneColor);
 }
 
 function syncStones() {
   const n = state.moves.length;
-  while (stoneMeshes.length > n) {
-    const m = stoneMeshes.pop();
-    boardGroup.remove(m);
-  }
+  const prev = stones.count;
   for (let i = 0; i < n; i++) {
     const owner = state.owners[i] || (i % 2 === 0 ? 1 : 2);
     const [x, y] = posToXY(state.moves[i]);
-    if (!stoneMeshes[i]) {
-      const mesh = makeStone(owner);
-      const w = cellToWorld(x, y);
-      mesh.position.set(w.x, STONE_Y, w.z);
-      mesh.userData.drop = 0;
-      mesh.userData.startY = STONE_Y + 3.2;
-      mesh.position.y = mesh.userData.startY;
-      boardGroup.add(mesh);
-      stoneMeshes[i] = mesh;
-    } else if (stoneMeshes[i].userData.owner !== owner) {
-      stoneMeshes[i].material = stoneMat[owner] || stoneMat[1];
-      stoneMeshes[i].userData.owner = owner;
-    }
+    if (i >= prev) { stoneAnim[i].drop = 0; stoneAnim[i].startY = STONE_Y + 3.2; }
+    writeStone(i, owner, x, y, stoneAnim[i].drop);
   }
+  for (let i = n; i < prev; i++) stoneAnim[i].drop = 1;
+  stones.count = n;
+  stones.instanceMatrix.needsUpdate = true;
+  if (stones.instanceColor) stones.instanceColor.needsUpdate = true;
 }
 
 /* 最后一手标记 */
@@ -771,6 +776,15 @@ function watcherTarget(index, count) {
 function removeAvatar(id) {
   const av = avatars.get(id);
   if (!av) return;
+  av.group.traverse(o => {
+    if (o.isMesh) {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        if (Array.isArray(o.material)) o.material.forEach(m => m.dispose());
+        else o.material.dispose();
+      }
+    }
+  });
   avatarGroup.remove(av.group);
   scene.remove(av.label.sprite);
   av.label.tex.dispose();
@@ -897,6 +911,7 @@ function setGhost() {
 }
 
 function activateCell(x, y) {
+  markActive();
   if (!profile) { showEntry(false); return; }
   if (state.winner) { toast('本局已结束，点「新局」再开一盘'); return; }
   if (!window.mqtt) { toast('组件还在加载，稍等几秒…'); return; }
@@ -916,6 +931,7 @@ function activateCell(x, y) {
 }
 
 function onPointerDown(e) {
+  markActive();
   renderer.domElement.setPointerCapture && renderer.domElement.setPointerCapture(e.pointerId);
   pointerMap.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pointerMap.size === 1) {
@@ -926,6 +942,7 @@ function onPointerDown(e) {
   }
 }
 function onPointerMove(e) {
+  markActive();
   if (!pointerMap.has(e.pointerId)) {
     const cell = pick(e.clientX, e.clientY);
     hoverCell = cell;
@@ -956,6 +973,7 @@ function onPointerMove(e) {
   }
 }
 function onPointerUp(e) {
+  markActive();
   pointerMap.delete(e.pointerId);
   if (pointerMap.size < 2) pinchDist = 0;
   if (pointerMap.size === 0) {
@@ -972,6 +990,7 @@ renderer.domElement.addEventListener('pointerup', onPointerUp);
 renderer.domElement.addEventListener('pointercancel', onPointerUp);
 renderer.domElement.addEventListener('wheel', function (e) {
   e.preventDefault();
+  markActive();
   camTarget.radius = Math.max(14, Math.min(42, camTarget.radius * Math.exp(e.deltaY * 0.0011)));
   userZoom = true;
 }, { passive: false });
@@ -1047,6 +1066,7 @@ function renderLog() {
 
 let lastRosterJson = '', lastLogJson = '', entrySig = null;
 function updateAll() {
+  markActive();
   updateNetUI();
   setStatus();
   const mb = $('modeBadge');
@@ -1061,6 +1081,7 @@ function updateAll() {
   updateWinLine();
   setGhost();
   syncAvatars();
+  renderer.shadowMap.needsUpdate = true;
   maybeRenderEntry();
 }
 
@@ -1447,21 +1468,29 @@ window.addEventListener('beforeunload', announceLeave);
 
 let lastT = performance.now();
 let firstFrame = true;
+let lastActive = performance.now();
+let idleTick = 0;
+function markActive() { lastActive = performance.now(); }
 function animate(now) {
   requestAnimationFrame(animate);
   const dt = Math.min(0.05, Math.max(0.001, (now - lastT) / 1000));
   lastT = now;
   updateCamera(dt);
-  for (const m of stoneMeshes) {
-    const ud = m.userData;
-    if (ud.drop !== undefined && ud.drop < 1) {
-      ud.drop = Math.min(1, ud.drop + dt * 2.6);
-      const e = 1 - Math.pow(1 - ud.drop, 3);
-      m.position.y = ud.startY + (STONE_Y - ud.startY) * e;
-      const s = 0.7 + 0.3 * e;
-      m.scale.set(s, s, s);
-      if (ud.drop >= 1) m.position.y = STONE_Y;
+  let anyDrop = false;
+  for (let i = 0; i < stones.count; i++) {
+    const a = stoneAnim[i];
+    if (a.drop < 1) {
+      a.drop = Math.min(1, a.drop + dt * 2.6);
+      const owner = state.owners[i] || (i % 2 === 0 ? 1 : 2);
+      const [x, y] = posToXY(state.moves[i]);
+      writeStone(i, owner, x, y, a.drop);
+      anyDrop = true;
     }
+  }
+  if (anyDrop) {
+    stones.instanceMatrix.needsUpdate = true;
+    if (stones.instanceColor) stones.instanceColor.needsUpdate = true;
+    renderer.shadowMap.needsUpdate = true;
   }
   const pulse = 0.5 + 0.5 * Math.sin(now / 380);
   lastRing.material.opacity = 0.55 + 0.35 * pulse;
@@ -1471,6 +1500,10 @@ function animate(now) {
     for (const c of winGroup.children) {
       if (c.material) c.material.opacity = 0.65 + 0.3 * pulse;
     }
+  }
+  if (now - lastActive > 8000 && pointerMap.size === 0 && !drag && !anyDrop) {
+    idleTick ^= 1;
+    if (idleTick) return;
   }
   dust.rotation.y += dt * 0.02;
   dust.position.y = Math.sin(now / 4000) * 0.3;
@@ -1494,7 +1527,7 @@ function exposeTest() {
     state, peers, net, camera, renderer, scene, updateAll, avatars,
     getProfile: () => profile,
     activateCell,
-    stoneCount: () => boardGroup.children.filter(o => o.geometry === stoneGeo && o !== ghost).length,
+    stoneCount: () => stones.count,
     screenPoint: (x, y) => {
       const w = cellToWorld(x, y);
       const v = w.clone().project(camera);
