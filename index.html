@@ -1122,7 +1122,7 @@ function knockTarget(target, attacker) {
   px += Math.cos(radial) * 0.75;
   pz -= Math.sin(radial) * 0.75;
   const onBoard = Math.abs(px) <= 8.4 && Math.abs(pz) <= 8.4;
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0.0, emissive: 0x555555, flatShading: true });
+  const mat = new THREE.MeshStandardMaterial({ color: 0x6b3b1c, roughness: 0.55, metalness: 0.03, emissive: 0x1f1006, flatShading: true });
   const g = new THREE.Group();
   const blob = (r, sx, sy, sz, x, y, z) => {
     const m = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), mat);
@@ -1276,7 +1276,7 @@ function triggerSelfAction() {
   const others = [...avatars.values()].filter(a => a.id !== net.id);
   let fightTarget = null;
   if (others.length) fightTarget = pickFightTarget(me, others);
-  const entries = [['walk', 40], ['fall', 10], ['poop', 10]];
+  const entries = [['walk', 35], ['fall', 10], ['poop', 15]];
   if (fightTarget) entries.push(['fight', 40]);
   let type = pickWeighted(entries);
   let targetId = null, hit = false, kind = 'punch', bx = null, bz = null;
