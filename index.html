@@ -637,7 +637,7 @@ const THINK_HEX = { 0: 0x8c7a5e, 1: 0x7fd4ff, 2: 0xffe6a0, 3: 0xff8a7a, 4: 0x7cc
 const MAX_AVATARS = 10;
 const BOARD_HALF = 8.3;
 const WALK_RADIUS = 12.6;
-const ARENA_CORNERS = [[8.9, 8.9], [-8.9, 8.9], [8.9, -8.9], [-8.9, -8.9]];
+const ARC_RADIUS = 11.8;
 const avatarGroup = new THREE.Group();
 scene.add(avatarGroup);
 const avatars = new Map();
@@ -700,22 +700,34 @@ function segmentHitsBoard(ax, az, bx, bz) {
 }
 function planPath(sx, sz, tx, tz) {
   if (!segmentHitsBoard(sx, sz, tx, tz)) return [[tx, tz]];
-  let best = null;
-  const consider = (pts) => {
-    let px = sx, pz = sz, len = 0;
-    for (const [x, z] of pts) {
-      if (segmentHitsBoard(px, pz, x, z)) return;
-      len += Math.hypot(x - px, z - pz);
-      px = x; pz = z;
-    }
-    if (!best || len < best.len) best = { len, path: pts };
-  };
-  for (const c1 of ARENA_CORNERS) consider([[c1[0], c1[1]], [tx, tz]]);
-  for (const c1 of ARENA_CORNERS) for (const c2 of ARENA_CORNERS) {
-    if (c1 === c2) continue;
-    consider([[c1[0], c1[1]], [c2[0], c2[1]], [tx, tz]]);
+  const a0 = Math.atan2(sx, sz);
+  const a1 = Math.atan2(tx, tz);
+  const r0 = Math.hypot(sx, sz);
+  const r1 = Math.hypot(tx, tz);
+  const points = [];
+  if (Math.abs(r0 - ARC_RADIUS) > 0.05) {
+    const p0x = Math.sin(a0) * ARC_RADIUS, p0z = Math.cos(a0) * ARC_RADIUS;
+    if (segmentHitsBoard(sx, sz, p0x, p0z)) return null;
+    points.push([p0x, p0z]);
   }
-  return best ? best.path : null;
+  const d = shortestAngle(a1 - a0);
+  const steps = Math.max(2, Math.ceil(Math.abs(d) / 0.16));
+  for (let i = 1; i < steps; i++) {
+    const a = a0 + d * i / steps;
+    points.push([Math.sin(a) * ARC_RADIUS, Math.cos(a) * ARC_RADIUS]);
+  }
+  if (Math.abs(r1 - ARC_RADIUS) > 0.05) {
+    const p1x = Math.sin(a1) * ARC_RADIUS, p1z = Math.cos(a1) * ARC_RADIUS;
+    if (segmentHitsBoard(p1x, p1z, tx, tz)) return null;
+    points.push([p1x, p1z]);
+  }
+  points.push([tx, tz]);
+  let px = sx, pz = sz;
+  for (const [x, z] of points) {
+    if (segmentHitsBoard(px, pz, x, z)) return null;
+    px = x; pz = z;
+  }
+  return points;
 }
 function randomArenaPoint(minR, maxR, others) {
   for (let i = 0; i < 80; i++) {
@@ -746,7 +758,16 @@ function moveAlong(av, dt, speed) {
   return !av.path || av.path.length === 0;
 }
 
-function moveToward(av, tx, tz, dt, speed) {
+function pickWalkTarget(av) {
+  let fallback = null;
+  for (let i = 0; i < 24; i++) {
+    const pt = randomArenaPoint(9.0, 12.2);
+    if (Math.hypot(pt.x - av.x, pt.z - av.z) < 1.6) continue;
+    if (!segmentHitsBoard(av.x, av.z, pt.x, pt.z)) return pt;
+    fallback = pt;
+  }
+  return fallback;
+}function moveToward(av, tx, tz, dt, speed) {
   const dx = tx - av.x, dz = tz - av.z;
   const d = Math.hypot(dx, dz);
   if (d < 0.05) return true;
@@ -773,6 +794,7 @@ function fightPlan(av, target) {
 }
 function pickFightTarget(av, others) {
   const shuffled = [...others].sort(() => Math.random() - 0.5);
+  for (const t of shuffled) if (!segmentHitsBoard(av.x, av.z, t.x, t.z) && fightPlan(av, t)) return t;
   for (const t of shuffled) if (fightPlan(av, t)) return t;
   return null;
 }
@@ -1051,12 +1073,9 @@ function startAction(av, type, opts = {}) {
     hit: !!opts.hit, kind: opts.kind || 'punch', impacted: false, pooped: false, targetId: null
   };
   if (type === 'walk') {
-    let path = null;
-    for (let i = 0; i < 12; i++) {
-      const pt = randomArenaPoint(9.0, 12.2);
-      path = planPath(av.x, av.z, pt.x, pt.z);
-      if (path) break;
-    }
+    const pt = pickWalkTarget(av);
+    if (!pt) return false;
+    const path = planPath(av.x, av.z, pt.x, pt.z);
     if (!path) return false;
     a.path = path;
   } else if (type === 'fall') {
@@ -1157,7 +1176,7 @@ function knockTarget(target, attacker) {
   }
 }function updateFight(av, a, dt) {
   if (a.phase === 'approach') {
-    const done = moveAlong(av, dt, 6.0);
+    const done = moveAlong(av, dt, 7.0);
     swingLimbs(av, Math.sin(a.t * 14) * 0.5);
     a._bob = Math.abs(Math.sin(a.t * 14)) * 0.05;
     if (done) { a.phase = 'strike'; a.t = 0; }
