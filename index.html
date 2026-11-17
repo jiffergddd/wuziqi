@@ -746,6 +746,36 @@ function moveAlong(av, dt, speed) {
   return !av.path || av.path.length === 0;
 }
 
+function moveToward(av, tx, tz, dt, speed) {
+  const dx = tx - av.x, dz = tz - av.z;
+  const d = Math.hypot(dx, dz);
+  if (d < 0.05) return true;
+  const step = Math.min(d, speed * dt);
+  av.x += dx / d * step;
+  av.z += dz / d * step;
+  return step >= d - 0.05;
+}
+function pickWeighted(entries) {
+  let total = 0;
+  for (const e of entries) total += e[1];
+  let r = Math.random() * total;
+  for (const [type, w] of entries) {
+    r -= w;
+    if (r <= 0) return type;
+  }
+  return entries[entries.length - 1][0];
+}
+function fightPlan(av, target) {
+  const dx = target.x - av.x, dz = target.z - av.z;
+  const d = Math.hypot(dx, dz) || 1;
+  const stop = clampArena(target.x - dx / d * 1.25, target.z - dz / d * 1.25);
+  return planPath(av.x, av.z, stop.x, stop.z);
+}
+function pickFightTarget(av, others) {
+  const shuffled = [...others].sort(() => Math.random() - 0.5);
+  for (const t of shuffled) if (fightPlan(av, t)) return t;
+  return null;
+}
 function drawNameLabel(label, name, team) {
   const c = label.canvas, g = c.getContext('2d');
   const w = c.width, h = c.height;
@@ -932,7 +962,7 @@ function createAvatar(peer) {
   return {
     id: peer.id, group: g, legs, arms, tail, scale, label, role, halo, thinking: false,
     name: peer.name, team: peer.team, phase: rng() * Math.PI * 2, baseY: -0.6,
-    x: 0, z: 0, action: null, fallRot: 0
+    x: 0, z: 0, y: -0.6, squat: 0, leanRot: 0, action: null, fallRot: 0
   };
 }
 
@@ -949,13 +979,15 @@ function swingLimbs(av, v) {
 function poseAvatar(av, bob) {
   const x = av.x;
   const z = av.z;
-  av.group.position.set(x, av.baseY + bob, z);
+  const sy = av.scale * (1 - 0.22 * (av.squat || 0));
+  av.group.scale.set(av.scale, sy, av.scale);
+  av.group.position.set(x, av.y + bob, z);
   av.group.rotation.y = Math.atan2(-x, -z);
-  const nameY = av.baseY + bob + 2.02 * av.scale + 0.22 + (av.labelLift || 0);
+  const nameY = av.y + bob + 2.02 * sy + 0.22 + (av.labelLift || 0);
   av.label.sprite.position.set(x, nameY, z);
   av.role.sprite.position.set(x, nameY + 0.82, z);
   av.halo.position.set(x, nameY + 0.82, z);
-  av.group.rotation.x = av.fallRot || 0;
+  av.group.rotation.x = (av.fallRot || 0) + (av.leanRot || 0);
 }
 
 function removeAvatar(id) {
@@ -1011,9 +1043,9 @@ function syncAvatars() {
 }
 
 function startAction(av, type, opts = {}) {
-  if (!av || !avatars.has(av.id)) return;
-  if (av.action && av.action.type === 'knock') return;
-  if (!['walk', 'fall', 'poop', 'fight'].includes(type)) return;
+  if (!av || !avatars.has(av.id)) return false;
+  if (av.action && av.action.type === 'knock') return false;
+  if (!['walk', 'fall', 'poop', 'fight'].includes(type)) return false;
   const a = {
     type, t: 0, dur: 1.6, path: null, phase: 'walk',
     hit: !!opts.hit, kind: opts.kind || 'punch', impacted: false, pooped: false, targetId: null
@@ -1025,57 +1057,43 @@ function startAction(av, type, opts = {}) {
       path = planPath(av.x, av.z, pt.x, pt.z);
       if (path) break;
     }
-    if (!path) return;
+    if (!path) return false;
     a.path = path;
   } else if (type === 'fall') {
     a.dur = 2.6;
   } else if (type === 'poop') {
-    a.dur = 1.3;
+    a.phase = 'toBoard';
+    a.boardX = Number.isFinite(opts.bx) ? opts.bx : (Math.random() * 2 - 1) * 5.2;
+    a.boardZ = Number.isFinite(opts.bz) ? opts.bz : (Math.random() * 2 - 1) * 5.2;
+    a.returnX = av.x;
+    a.returnZ = av.z;
+    a.pooped = false;
   } else if (type === 'fight') {
     const target = opts.targetId ? avatars.get(opts.targetId) : null;
-    if (!target || target.id === av.id) {
-      a.type = 'walk';
-      let path = null;
-      for (let i = 0; i < 12; i++) {
-        const pt = randomArenaPoint(9.0, 12.2);
-        path = planPath(av.x, av.z, pt.x, pt.z);
-        if (path) break;
-      }
-      if (!path) return;
-      a.path = path;
-    } else {
-      const dx = target.x - av.x, dz = target.z - av.z;
-      const d = Math.hypot(dx, dz) || 1;
-      const stop = clampArena(target.x - dx / d * 1.25, target.z - dz / d * 1.25);
-      const path = planPath(av.x, av.z, stop.x, stop.z);
-      if (!path) {
-        a.type = 'walk';
-        let p2 = null;
-        for (let i = 0; i < 12; i++) {
-          const pt = randomArenaPoint(9.0, 12.2);
-          p2 = planPath(av.x, av.z, pt.x, pt.z);
-          if (p2) break;
-        }
-        if (!p2) return;
-        a.path = p2;
-      } else {
-        a.targetId = target.id;
-        a.hit = opts.hit !== undefined ? !!opts.hit : Math.random() < 0.75;
-        a.kind = opts.kind || (Math.random() < 0.5 ? 'punch' : 'kick');
-        a.path = path;
-        a.phase = 'approach';
-      }
-    }
+    if (!target || target.id === av.id) return false;
+    const path = fightPlan(av, target);
+    if (!path) return false;
+    a.targetId = target.id;
+    a.hit = opts.hit !== undefined ? !!opts.hit : Math.random() < 0.75;
+    a.kind = opts.kind || (Math.random() < 0.5 ? 'punch' : 'kick');
+    a.path = path;
+    a.phase = 'approach';
   }
   av.action = a;
   av.path = a.path;
   av.fallRot = 0;
+  av.leanRot = 0;
+  av.squat = 0;
   av.group.rotation.x = 0;
   resetLimbs(av);
-}function finishAction(av) {
+  return true;
+}
+function finishAction(av) {
   av.action = null;
   av.path = null;
   av.fallRot = 0;
+  av.leanRot = 0;
+  av.squat = 0;
   av.group.rotation.x = 0;
   resetLimbs(av);
 }
@@ -1091,24 +1109,45 @@ function knockTarget(target, attacker) {
   }
   target.action = { type: 'knock', t: 0, dur: 3.2, moveDur: 0.45, fromX: target.x, fromZ: target.z, toX: dest.x, toZ: dest.z };
   target.fallRot = 0;
+  target.leanRot = 0;
+  target.squat = 0;
   resetLimbs(target);
-}function spawnPoop(av) {
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.45, metalness: 0.0, emissive: 0x444444, flatShading: true });
+}function spawnPoop(av, px, pz) {
+  if (!Number.isFinite(px) || !Number.isFinite(pz)) {
+    const ang = Math.atan2(av.x, av.z);
+    px = av.x + Math.cos(ang) * 0.75;
+    pz = av.z - Math.sin(ang) * 0.75;
+  }
+  const radial = Math.atan2(av.x, av.z);
+  px += Math.cos(radial) * 0.75;
+  pz -= Math.sin(radial) * 0.75;
+  const onBoard = Math.abs(px) <= 8.4 && Math.abs(pz) <= 8.4;
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0.0, emissive: 0x555555, flatShading: true });
   const g = new THREE.Group();
-  const parts = [[0.45, 0.24], [0.32, 0.2], [0.2, 0.14]];
-  let y = 0;
-  for (const [r, h] of parts) {
-    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), mat);
-    m.position.y = y + h;
-    m.scale.y = 0.8;
+  const blob = (r, sx, sy, sz, x, y, z) => {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), mat);
+    m.position.set(x, y, z);
+    m.scale.set(sx, sy, sz);
     m.castShadow = true;
     g.add(m);
-    y += h * 1.5;
-  }
-  const ang = Math.atan2(av.x, av.z);
-  const px = av.x + Math.cos(ang) * 0.75;
-  const pz = av.z - Math.sin(ang) * 0.75;
-  g.position.set(px, av.baseY + 0.01, pz);
+  };
+  blob(0.44, 1, 0.55, 0.92, 0, 0.18, 0);
+  blob(0.34, 1, 0.62, 0.9, 0.06, 0.37, -0.02);
+  blob(0.25, 1, 0.68, 0.85, -0.05, 0.55, 0.02);
+  blob(0.16, 1, 0.75, 0.8, 0.04, 0.7, -0.01);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.095, 0.24, 8), mat);
+  tip.position.set(0.06, 0.86, 0);
+  tip.rotation.z = 0.38;
+  tip.castShadow = true;
+  g.add(tip);
+  const ridge = new THREE.Mesh(new THREE.TorusGeometry(0.27, 0.035, 5, 16, Math.PI * 1.25), mat);
+  ridge.position.set(0, 0.38, 0);
+  ridge.rotation.x = Math.PI / 2;
+  ridge.rotation.z = 0.5;
+  ridge.castShadow = true;
+  g.add(ridge);
+  g.scale.setScalar(1.5);
+  g.position.set(px, onBoard ? 0.02 : av.baseY + 0.01, pz);
   scene.add(g);
   poops.push({ group: g, t: 0, life: 8 });
   if (poops.length > 12) {
@@ -1116,8 +1155,7 @@ function knockTarget(target, attacker) {
     scene.remove(old.group);
     old.group.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
   }
-}
-function updateFight(av, a, dt) {
+}function updateFight(av, a, dt) {
   if (a.phase === 'approach') {
     const done = moveAlong(av, dt, 6.0);
     swingLimbs(av, Math.sin(a.t * 14) * 0.5);
@@ -1150,6 +1188,8 @@ function updateAvatarActions(dt, now) {
       bob = Math.sin(now / 650 + av.phase) * 0.025;
       av.group.rotation.z = Math.sin(now / 900 + av.phase) * 0.012;
       av.fallRot = 0;
+      av.leanRot = 0;
+      av.squat = 0;
       resetLimbs(av);
     } else {
       const a = av.action;
@@ -1167,9 +1207,28 @@ function updateAvatarActions(dt, now) {
         av.fallRot = -(Math.PI / 2) * Math.max(0, Math.min(1, f));
         if (a.t >= 2.6) finishAction(av);
       } else if (a.type === 'poop') {
-        bob = -0.1 * Math.sin(Math.min(1, a.t / 0.35) * Math.PI);
-        if (!a.pooped && a.t > 0.35) { a.pooped = true; spawnPoop(av); }
-        if (a.t >= 1.3) finishAction(av);
+        if (a.phase === 'toBoard') {
+          const done = moveToward(av, a.boardX, a.boardZ, dt, 6.5);
+          bob = Math.abs(Math.sin(a.t * 12)) * 0.06;
+          swingLimbs(av, Math.sin(a.t * 12) * 0.55);
+          if (done) { a.phase = 'squat'; a.t = 0; }
+        } else if (a.phase === 'squat') {
+          const k = Math.min(1, a.t / 0.45);
+          bob = -0.08 * Math.sin(k * Math.PI / 2);
+          av.squat = k;
+          av.legs[0].rotation.x = 1.1 * k;
+          av.legs[1].rotation.x = 1.1 * k;
+          av.arms[0].rotation.x = -0.7 * k;
+          av.arms[1].rotation.x = -0.7 * k;
+          av.leanRot = 0.16 * k;
+          if (!a.pooped && a.t > 0.4) { a.pooped = true; spawnPoop(av, av.x, av.z); }
+          if (a.t >= 1.1) { a.phase = 'leave'; a.t = 0; av.leanRot = 0; av.squat = 0; resetLimbs(av); }
+        } else {
+          const done = moveToward(av, a.returnX, a.returnZ, dt, 6.5);
+          bob = Math.abs(Math.sin(a.t * 12)) * 0.06;
+          swingLimbs(av, Math.sin(a.t * 12) * 0.55);
+          if (done) finishAction(av);
+        }
       } else if (a.type === 'fight') {
         updateFight(av, a, dt);
         bob = a._bob || 0;
@@ -1182,6 +1241,9 @@ function updateAvatarActions(dt, now) {
         if (a.t >= 3.2) finishAction(av);
       }
     }
+    const onBoardNow = Math.abs(av.x) <= 8.4 && Math.abs(av.z) <= 8.4;
+    const targetY = onBoardNow ? 0 : av.baseY;
+    av.y += (targetY - av.y) * Math.min(1, dt * 12);
     poseAvatar(av, bob);
     if (av.thinking) {
       const hp = 0.5 + 0.5 * Math.sin(now / 260 + av.phase);
@@ -1212,19 +1274,27 @@ function triggerSelfAction() {
   if (performance.now() - lastSelfAction < 3000) return;
   lastSelfAction = performance.now();
   const others = [...avatars.values()].filter(a => a.id !== net.id);
-  let type = ['walk', 'fall', 'poop', 'fight'][Math.floor(Math.random() * 4)];
-  if (type === 'fight' && !others.length) type = 'walk';
-  let targetId = null, hit = false, kind = 'punch';
+  let fightTarget = null;
+  if (others.length) fightTarget = pickFightTarget(me, others);
+  const entries = [['walk', 40], ['fall', 10], ['poop', 10]];
+  if (fightTarget) entries.push(['fight', 40]);
+  let type = pickWeighted(entries);
+  let targetId = null, hit = false, kind = 'punch', bx = null, bz = null;
   if (type === 'fight') {
-    const t = others[Math.floor(Math.random() * others.length)];
-    targetId = t.id;
+    targetId = fightTarget.id;
     hit = Math.random() < 0.75;
     kind = Math.random() < 0.5 ? 'punch' : 'kick';
+  } else if (type === 'poop') {
+    bx = (Math.random() * 2 - 1) * 5.2;
+    bz = (Math.random() * 2 - 1) * 5.2;
   }
-  startAction(me, type, { targetId, hit, kind });
-  publishAction(type, { t: targetId, hit, kind });
-}
-function publishAction(type, data) {
+  if (!startAction(me, type, { targetId, hit, kind, bx, bz })) {
+    type = 'walk';
+    targetId = null;
+    if (!startAction(me, 'walk')) return;
+  }
+  publishAction(type, { t: targetId, hit, kind, bx, bz });
+}function publishAction(type, data) {
   if (!net.client || !net.connected) return;
   try {
     net.client.publish(T_ACT, JSON.stringify(Object.assign({ from: net.id, a: type }, data || {})), { qos: 0 });
@@ -1239,7 +1309,7 @@ function onAct(payload) {
   const now = Date.now();
   if (now - (actSeen.get(d.from) || 0) < 700) return;
   actSeen.set(d.from, now);
-  startAction(av, d.a, { targetId: d.t, hit: d.hit, kind: d.kind });
+  startAction(av, d.a, { targetId: d.t, hit: d.hit, kind: d.kind, bx: d.bx, bz: d.bz });
 }
 /* ================= 相机/输入 ================= */
 function resize() {
@@ -1941,7 +2011,7 @@ function animate(now) {
 
 function exposeTest() {
   window.__wzq3d = {
-    state, peers, net, camera, renderer, scene, updateAll, avatars, poops, startAction, triggerSelfAction,
+    state, peers, net, camera, renderer, scene, updateAll, avatars, poops, startAction, triggerSelfAction, pickWeighted,
     getProfile: () => profile,
     activateCell,
     stoneCount: () => stones.count,
