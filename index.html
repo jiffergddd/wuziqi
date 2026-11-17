@@ -103,6 +103,19 @@
   .side-btn:disabled { opacity:.5; cursor:not-allowed; }
   .sdot { width:15px; height:15px; border-radius:50%; border:1px solid rgba(0,0,0,.35); flex:none; }
   #entryCancel { width:100%; padding:10px; font:inherit; font-size:13px; color:#b9a586; background:none; border:none; cursor:pointer; }
+  #modeModal { position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(5,4,3,.7); backdrop-filter:blur(4px); }
+  #modeModal.hidden { display:none; }
+  .mode-card { width:100%; max-width:420px; background:rgba(22,16,12,.98); border:1px solid rgba(224,179,106,.3); border-radius:18px; padding:18px; box-shadow:0 20px 60px rgba(0,0,0,.6); }
+  .mode-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+  .mode-head h3 { font-size:18px; color:#f6e6c9; margin:0; }
+  #modeClose { font:inherit; color:#c9b795; background:none; border:none; font-size:16px; cursor:pointer; padding:2px 6px; }
+  .mode-tip { font-size:12px; color:#a08a6c; margin:0 0 12px; line-height:1.5; }
+  .mode-option { display:flex; flex-direction:column; gap:4px; width:100%; text-align:left; margin-bottom:8px; padding:12px 14px; font:inherit; color:#efe1c7; background:rgba(255,255,255,.05); border:1px solid rgba(224,179,106,.2); border-radius:12px; cursor:pointer; }
+  .mode-option:active { background:rgba(255,255,255,.12); }
+  .mode-option.current { border-color:#e0b36a; background:rgba(224,179,106,.12); }
+  .mode-name { font-size:15px; font-weight:600; display:flex; align-items:center; gap:8px; }
+  .mode-desc { font-size:11px; color:#a08a6c; line-height:1.5; }
+  .mode-tag { font-size:10px; color:#e0b36a; border:1px solid rgba(224,179,106,.45); border-radius:8px; padding:1px 6px; }
 
   @media (max-width: 720px) {
     .brand h1 { font-size:15px; }
@@ -166,6 +179,13 @@
   </div>
 </div>
 
+<div id="modeModal" class="hidden">
+  <div class="mode-card">
+    <div class="mode-head"><h3>选择模式</h3><button id="modeClose">✕</button></div>
+    <p class="mode-tip">切换模式会清空当前棋盘</p>
+    <div id="modeList"></div>
+  </div>
+</div>
 <div id="toast"></div>
 
 <script>
@@ -199,6 +219,11 @@ const LS_STATE = 'wzq_room_state_v1';
 const SEAT_NAMES = { 0: '观战', 1: '黑方', 2: '白方', 3: '褐方', 4: '灰方' };
 const SEAT_CLASS = { 0: '', 1: 'black', 2: 'white', 3: 'brown', 4: 'gray' };
 const MODE_NAME = { team: '双人接力', ffa: '四人乱战', '2v2': '2v2 黑褐 vs 白灰' };
+const MODE_INFO = [
+  { id: 'team', name: '双人接力', desc: '2 人黑白各一方，队友可以接力落子' },
+  { id: 'ffa', name: '四人乱战', desc: '4 人每人一色，各自连成五子' },
+  { id: '2v2', name: '2v2 黑褐 vs 白灰', desc: '4 人四色，黑+褐 vs 白+灰，同队两色合计五连' }
+];
 const BROKERS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt'];
 const T_STATE = ROOM_KEY + '/state';
 const T_EVT = ROOM_KEY + '/evt';
@@ -1972,14 +1997,34 @@ $('btnNew').addEventListener('click', function () {
   if (isHost()) hostApplyReset(net.id);
   else if (!sendEvt({ k: 'reset' })) toast('还没连上房间');
 });
-$('btnMode').addEventListener('click', function () {
+function openModeModal() {
   if (!net.connected) { toast('还没连上房间'); return; }
   if (!peers.size) { toast('正在进入房间，稍等一秒再试'); return; }
-  const next = state.mode === 'team' ? 'ffa' : state.mode === 'ffa' ? '2v2' : 'team';
-  if (!confirm('切换到「' + MODE_NAME[next] + '」模式？棋盘会清空并重新开始。')) return;
-  if (isHost()) hostApplyMode(net.id, next);
-  else if (!sendEvt({ k: 'mode', mode: next })) toast('还没连上房间');
+  $('modeList').innerHTML = MODE_INFO.map(m => {
+    const cur = m.id === state.mode;
+    return '<button class="mode-option' + (cur ? ' current' : '') + '" data-mode="' + m.id + '">'
+      + '<span class="mode-name">' + m.name + (cur ? '<span class="mode-tag">当前</span>' : '') + '</span>'
+      + '<span class="mode-desc">' + m.desc + '</span></button>';
+  }).join('');
+  $('modeModal').classList.remove('hidden');
+}
+function closeModeModal() { $('modeModal').classList.add('hidden'); }
+function applyModeChoice(mode) {
+  if (!MODE_NAME[mode]) return;
+  closeModeModal();
+  if (mode === state.mode) { toast('已经是「' + MODE_NAME[mode] + '」模式'); return; }
+  if (!net.connected) { toast('还没连上房间'); return; }
+  if (isHost()) hostApplyMode(net.id, mode);
+  else if (!sendEvt({ k: 'mode', mode })) toast('还没连上房间');
+}
+$('btnMode').addEventListener('click', openModeModal);
+$('modeClose').addEventListener('click', closeModeModal);
+$('modeModal').addEventListener('click', e => { if (e.target === $('modeModal')) closeModeModal(); });
+$('modeList').addEventListener('click', e => {
+  const b = e.target.closest('[data-mode]');
+  if (b) applyModeChoice(b.getAttribute('data-mode'));
 });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') closeModeModal(); });
 $('btnProfile').addEventListener('click', () => showEntry(true));
 $('btnPanel').addEventListener('click', () => $('panel').classList.toggle('open'));
 $('panelClose').addEventListener('click', () => $('panel').classList.remove('open'));
