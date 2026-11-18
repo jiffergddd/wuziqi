@@ -227,7 +227,7 @@ const MODE_INFO = [
   { id: 'ffa', name: '四人乱战', desc: '4 人每人一色，各自连成五子' },
   { id: '2v2', name: '2v2 黑褐 vs 白灰', desc: '4 人四色，黑+褐 vs 白+灰，同队两色合计五连' }
 ];
-const BROKERS = ['wss://broker.hivemq.com:8884/mqtt'];
+const BROKERS = ['wss://broker.emqx.io:8084/mqtt'];
 const T_STATE = ROOM_KEY + '/state';
 const T_EVT = ROOM_KEY + '/evt';
 const T_ACT = ROOM_KEY + '/act';
@@ -1648,7 +1648,7 @@ function updateNetUI() {
     b.textContent = net.scriptFailed ? '组件加载失败，重试中…' : '加载中…';
     return;
   }
-  if (net.connected) { b.className = 'badge ok'; b.textContent = '🟢 已连接 · ' + peers.size + ' 人'; }
+  if (net.connected) { b.className = 'badge ok'; b.textContent = '🟢 已连接 · ' + peers.size + ' 人'; b.title = net.broker || ''; }
   else if (net.allFailed) { b.className = 'badge bad'; b.textContent = '🔴 服务器不可达'; }
   else { b.className = 'badge warn'; b.textContent = '🟡 连接中…'; }
 }
@@ -1969,7 +1969,7 @@ function decodeJson(payload) { try { return JSON.parse(new TextDecoder().decode(
 function liveHostId() {
   if (state.hostId && peers.has(state.hostId)) return state.hostId;
   if (!peers.size) return null;
-  return [...peers.keys()].sort()[0];
+  return [...peers.values()].sort((a, b) => ((a.joinedAt || a.ts || 0) - (b.joinedAt || b.ts || 0)) || a.id.localeCompare(b.id))[0].id;
 }
 function isHost() { return net.connected && peers.has(net.id) && liveHostId() === net.id; }
 
@@ -1994,20 +1994,20 @@ function connectBroker(idx) {
   if (!window.mqtt) return;
   if (idx >= BROKERS.length) {
     net.connected = false; net.allFailed = true; updateAll();
-    setTimeout(() => connectBroker(0), 10000);
+    setTimeout(() => connectBroker(0), 15000);
     return;
   }
   let c;
   try {
     c = mqtt.connect(BROKERS[idx], {
-      clientId: 'wzq3d_' + net.id, keepalive: 20, clean: true, reconnectPeriod: 0, connectTimeout: 5000,
+      clientId: 'wzq3d_' + net.id, keepalive: 20, clean: true, reconnectPeriod: 0, connectTimeout: 8000,
       will: { topic: whoTopic(net.id), payload: '', qos: 1, retain: true }
     });
   } catch (e) { setTimeout(() => connectBroker(idx + 1), 200); return; }
   net.client = c;
   net.connected = false;
   let everConnected = false, dead = false;
-  const guard = setTimeout(() => { if (!everConnected) onFail(); }, 7000);
+  const guard = setTimeout(() => { if (!everConnected) onFail(); }, 12000);
   const onFail = () => {
     if (dead) return;
     dead = true;
@@ -2024,6 +2024,7 @@ function connectBroker(idx) {
     clearTimeout(guard);
     net.connected = true;
     net.connectedAt = Date.now();
+    net.broker = BROKERS[idx];
     net.allFailed = false;
     c.subscribe(ROOM_KEY + '/#', { qos: 1 });
     setTimeout(publishMe, 0);
