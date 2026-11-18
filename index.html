@@ -235,7 +235,9 @@ const whoTopic = id => ROOM_KEY + '/who/' + id;
 const STONE_HEX = { 1: 0x111112, 2: 0xf5efe2, 3: 0x8b5a2b, 4: 0x9aa0a6 };
 
 /* ================= 状态 ================= */
-const state = { mode: 'team', moves: [], owners: [], log: [], winner: 0, winLine: null, pending: null, seq: 0, hostId: null, turn: 1, swapped: false };
+function newPlayerId() { return 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10); }
+function newMatchId() { return 'm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+const state = { mode: 'team', moves: [], owners: [], log: [], winner: 0, winLine: null, pending: null, seq: 0, hostId: null, turn: 1, swapped: false, matchId: newMatchId(), matchPlayers: [] };
 let board = [];
 let peers = new Map();
 let profile = null;
@@ -367,7 +369,7 @@ function enforceTeamSeats() {
 
 /* ================= 存储 ================= */
 function saveRoom() {
-  try { localStorage.setItem(LS_STATE, JSON.stringify({ mode: state.mode, moves: state.moves, owners: state.owners, turn: state.turn, log: state.log, swapped: state.swapped, ts: Date.now() })); } catch (e) {}
+  try { localStorage.setItem(LS_STATE, JSON.stringify({ mode: state.mode, moves: state.moves, owners: state.owners, turn: state.turn, log: state.log, swapped: state.swapped, matchId: state.matchId, matchPlayers: state.matchPlayers, ts: Date.now() })); } catch (e) {}
 }
 function loadSavedState() {
   try { const d = JSON.parse(localStorage.getItem(LS_STATE) || 'null'); if (d && typeof d === 'object') return d; } catch (e) {}
@@ -377,11 +379,20 @@ function saveProfile() { try { localStorage.setItem(LS_PROFILE, JSON.stringify(p
 function loadProfile() {
   try {
     const p = JSON.parse(localStorage.getItem(LS_PROFILE) || 'null');
-    if (p && typeof p.name === 'string' && [0, 1, 2, 3, 4].includes(p.team)) return { name: p.name.slice(0, 10), team: p.team };
+    if (p && typeof p.name === 'string' && [0, 1, 2, 3, 4].includes(p.team)) {
+      return {
+        name: p.name.slice(0, 10),
+        team: p.team,
+        playerId: typeof p.playerId === 'string' && p.playerId ? p.playerId : newPlayerId(),
+        wins: Number.isInteger(p.wins) && p.wins >= 0 ? Math.min(p.wins, 999999) : 0,
+        losses: Number.isInteger(p.losses) && p.losses >= 0 ? Math.min(p.losses, 999999) : 0,
+        lastMatchId: typeof p.lastMatchId === 'string' ? p.lastMatchId : '',
+        statsTs: Number.isFinite(p.statsTs) ? p.statsTs : 0
+      };
+    }
   } catch (e) {}
   return null;
 }
-
 /* ================= 3D 场景 ================= */
 const sceneEl = $('scene');
 const IS_SMALL = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || Math.min(window.innerWidth, window.innerHeight) < 700;
@@ -544,6 +555,41 @@ function setupBoard() {
   }
 }
 setupBoard();
+
+/* ---------- 3D 在线 1v1 排行榜屏 ---------- */
+const lbCanvas = document.createElement('canvas');
+lbCanvas.width = 1200;
+lbCanvas.height = 420;
+const lbTexture = new THREE.CanvasTexture(lbCanvas);
+lbTexture.colorSpace = THREE.SRGBColorSpace;
+lbTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+const lbScreen = new THREE.Group();
+{
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x0b0b0d, roughness: 0.35, metalness: 0.85 });
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(24.8, 7.4, 0.5), frameMat);
+  frame.position.z = -0.28;
+  frame.castShadow = true;
+  lbScreen.add(frame);
+  const screenMat = new THREE.MeshBasicMaterial({ map: lbTexture, transparent: true, fog: false, toneMapped: false, side: THREE.DoubleSide });
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(24, 7), screenMat);
+  panel.position.z = 0.02;
+  lbScreen.add(panel);
+  const edge = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(24.9, 7.5, 0.55)),
+    new THREE.LineBasicMaterial({ color: 0xe0b36a, transparent: true, opacity: 0.85 })
+  );
+  edge.position.z = -0.28;
+  lbScreen.add(edge);
+  const postMat = new THREE.MeshStandardMaterial({ color: 0x17130f, roughness: 0.5, metalness: 0.6 });
+  for (const sx of [-10, 10]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 5.75, 8), postMat);
+    post.position.set(sx, -6.375, -0.28);
+    lbScreen.add(post);
+  }
+  lbScreen.position.set(0, 8.65, -17.4);
+  if (IS_SMALL) lbScreen.scale.setScalar(0.78);
+  scene.add(lbScreen);
+}
 
 
 
@@ -858,7 +904,7 @@ function pickFightTarget(av, others) {
   for (const t of shuffled) if (fightPlan(av, t)) return t;
   return null;
 }
-function drawNameLabel(label, name, team) {
+function drawNameLabel(label, name, team, wins, losses) {
   const c = label.canvas, g = c.getContext('2d');
   const w = c.width, h = c.height;
   g.clearRect(0, 0, w, h);
@@ -878,14 +924,27 @@ function drawNameLabel(label, name, team) {
   g.lineWidth = 3;
   g.strokeStyle = 'rgba(255,255,255,.45)';
   g.stroke();
-  g.font = '600 48px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  const total = (wins || 0) + (losses || 0);
+  const rateText = total ? Math.round((wins || 0) / total * 100) + '%' : '—';
+  const nameFont = '600 44px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  const rateFont = '700 36px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
   g.textAlign = 'left';
   g.textBaseline = 'middle';
+  g.font = rateFont;
+  const rateW = g.measureText(rateText).width;
+  const maxNameW = bw - 82 - rateW - 14;
+  let showName = String(name || '群友');
+  g.font = nameFont;
+  while (g.measureText(showName).width > maxNameW && showName.length > 1) showName = showName.slice(0, -1);
+  const nameW = g.measureText(showName).width;
   g.fillStyle = '#f7ead2';
-  g.fillText(name, x + 64, y + bh / 2 + 2, bw - 82);
+  g.fillText(showName, x + 64, y + bh / 2 + 2);
+  g.fillStyle = total ? '#7fd4ff' : '#8d795d';
+  g.font = rateFont;
+  g.fillText(rateText, x + 64 + nameW + 10, y + bh / 2 + 2);
   label.tex.needsUpdate = true;
 }
-function makeNameLabel(name, team) {
+function makeNameLabel(name, team, wins, losses) {
   const c = document.createElement('canvas');
   c.width = 512; c.height = 128;
   const tex = new THREE.CanvasTexture(c);
@@ -895,7 +954,7 @@ function makeNameLabel(name, team) {
   sprite.scale.set(IS_SMALL ? 3.0 : 3.5, IS_SMALL ? 0.75 : 0.88, 1);
   sprite.renderOrder = 30;
   const label = { canvas: c, tex, sprite };
-  drawNameLabel(label, name, team);
+  drawNameLabel(label, name, team, wins, losses);
   return label;
 }
 function drawRoleLabel(label, team) {
@@ -1038,12 +1097,12 @@ function createAvatar(peer) {
   g.userData.peerId = peer.id;
   const scale = IS_SMALL ? 2.0 + rng() * 0.2 : 2.9 + rng() * 0.4;
   g.scale.setScalar(scale);
-  const label = makeNameLabel(peer.name, peer.team);
+  const label = makeNameLabel(peer.name, peer.team, peer.wins || 0, peer.losses || 0);
   const role = makeRoleLabel(peer.team);
   const halo = makeHalo(peer.team);
   return {
     id: peer.id, group: g, legs, arms, tail, scale, label, role, halo, thinking: false,
-    name: peer.name, team: peer.team, phase: rng() * Math.PI * 2, baseY: -0.6,
+    name: peer.name, team: peer.team, wins: peer.wins || 0, losses: peer.losses || 0, phase: rng() * Math.PI * 2, baseY: -0.6,
     x: 0, z: 0, y: -0.6, squat: 0, leanRot: 0, action: null, fallRot: 0
   };
 }
@@ -1116,9 +1175,14 @@ function syncAvatars() {
       scene.add(av.halo);
       resetLimbs(av);
       poseAvatar(av, 0);
-    } else if (av.name !== p.name) {
-      av.name = p.name;
-      drawNameLabel(av.label, p.name, p.team);
+    } else {
+      const pw = p.wins || 0, pl = p.losses || 0;
+      if (av.name !== p.name || av.wins !== pw || av.losses !== pl) {
+        av.name = p.name;
+        av.wins = pw;
+        av.losses = pl;
+        drawNameLabel(av.label, p.name, p.team, pw, pl);
+      }
     }
   }
   for (const id of [...avatars.keys()]) if (!alive.has(id)) removeAvatar(id);
@@ -1644,9 +1708,160 @@ function renderLog() {
 }
 
 let lastRosterJson = '', lastLogJson = '', entrySig = null;
+/* ---------- 在线 1v1 排行榜数据与绘制 ---------- */
+let lbEntries = [];
+let lbPage = 0;
+let lbCount = -1;
+function getLeaderboardEntries() {
+  const map = new Map();
+  for (const r of peers.values()) {
+    const pid = r.playerId || r.id;
+    const e = { id: pid, name: r.name, wins: r.wins || 0, losses: r.losses || 0, ts: r.ts || 0, self: r.id === net.id };
+    const old = map.get(pid);
+    if (!old || e.ts >= old.ts) map.set(pid, e);
+  }
+  if (profile) {
+    const pid = profile.playerId || net.id;
+    map.set(pid, { id: pid, name: profile.name, wins: profile.wins || 0, losses: profile.losses || 0, ts: Date.now(), self: true });
+  }
+  const rate = e => { const g = e.wins + e.losses; return g ? e.wins / g : 0; };
+  return [...map.values()].sort((a, b) => b.wins - a.wins || rate(b) - rate(a) || a.losses - b.losses || a.name.localeCompare(b.name, 'zh'));
+}
+function cutName(name, max) {
+  const s = String(name || '群友');
+  return s.length > max ? s.slice(0, max) + '…' : s;
+}
+function drawLeaderboard() {
+  const g = lbCanvas.getContext('2d');
+  const W = lbCanvas.width, H = lbCanvas.height;
+  g.clearRect(0, 0, W, H);
+  const bg = g.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#0b1018');
+  bg.addColorStop(0.55, '#080b10');
+  bg.addColorStop(1, '#05070a');
+  g.fillStyle = bg;
+  g.fillRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(224,179,106,.75)';
+  g.lineWidth = 7;
+  g.strokeRect(7, 7, W - 14, H - 14);
+  g.strokeStyle = 'rgba(124,192,255,.16)';
+  g.lineWidth = 2;
+  g.strokeRect(20, 20, W - 40, H - 40);
+  for (let y = 26; y < H; y += 30) {
+    g.fillStyle = 'rgba(124,192,255,.035)';
+    g.fillRect(22, y, W - 44, 1);
+  }
+  g.textAlign = 'left';
+  g.textBaseline = 'middle';
+  g.fillStyle = '#f6e6c9';
+  g.font = '700 34px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  g.fillText('在线 1v1 排行榜', 34, 38);
+  g.fillStyle = '#a08a6c';
+  g.font = '500 14px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  g.fillText('本机战绩 · 在线娱乐榜 · 只统计双人接力', 36, 61);
+  const pages = Math.max(1, Math.ceil(lbEntries.length / 8));
+  g.textAlign = 'right';
+  g.fillStyle = '#e0b36a';
+  g.font = '600 18px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  g.fillText(lbEntries.length <= 8 ? '在线 ' + lbEntries.length + ' 人' : '第 ' + (lbPage + 1) + '/' + pages + ' 页 · 5s', W - 34, 38);
+  g.fillStyle = '#6f604b';
+  g.font = '500 12px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  g.fillText('每页 8 人' + (lbEntries.length > 8 ? ' · 轮播' : ''), W - 36, 61);
+  if (!lbEntries.length) {
+    g.textAlign = 'center';
+    g.fillStyle = '#8d795d';
+    g.font = '500 24px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText('暂无在线玩家，进房间后自动上榜', W / 2, H / 2 + 8);
+    lbTexture.needsUpdate = true;
+    return;
+  }
+  const start = lbPage * 8;
+  const pageEntries = lbEntries.slice(start, start + 8);
+  for (let i = 0; i < pageEntries.length; i++) {
+    const e = pageEntries[i];
+    const rank = start + i + 1;
+    const n = pageEntries.length;
+    const col = n < 4 ? (4 - n) / 2 + i : i % 4;
+    const row = n < 4 ? 0 : Math.floor(i / 4);
+    const x = 24 + col * 292;
+    const y = 86 + row * 150;
+    const w = 276, h = 132;
+    g.fillStyle = e.self ? 'rgba(224,179,106,.14)' : 'rgba(255,255,255,.045)';
+    g.beginPath();
+    if (g.roundRect) g.roundRect(x, y, w, h, 14); else g.rect(x, y, w, h);
+    g.fill();
+    g.lineWidth = e.self ? 2.5 : 1.5;
+    g.strokeStyle = e.self ? '#e0b36a' : 'rgba(255,255,255,.09)';
+    g.stroke();
+    const rankColor = rank === 1 ? '#ffd166' : rank === 2 ? '#cfd8e3' : rank === 3 ? '#d29a5b' : '#6f7d8d';
+    g.beginPath();
+    g.arc(x + 30, y + 66, 22, 0, Math.PI * 2);
+    g.fillStyle = rank === 1 ? 'rgba(255,209,102,.18)' : 'rgba(255,255,255,.05)';
+    g.fill();
+    g.strokeStyle = rankColor;
+    g.lineWidth = 2;
+    g.stroke();
+    g.textAlign = 'center';
+    g.fillStyle = rankColor;
+    g.font = '700 20px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText(String(rank), x + 30, y + 67);
+    g.textAlign = 'left';
+    g.fillStyle = '#f2e4cb';
+    g.font = '600 30px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText(cutName(e.name, e.self ? 4 : 5) + (e.self ? '（我）' : ''), x + 60, y + 44);
+    const total = e.wins + e.losses;
+    const rate = total ? Math.round(e.wins / total * 100) : 0;
+    g.fillStyle = '#a9b4c0';
+    g.font = '500 18px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText(e.wins + ' 胜 / ' + e.losses + ' 负', x + 62, y + 84);
+    g.textAlign = 'right';
+    g.fillStyle = total ? '#7fd4ff' : '#6f604b';
+    g.font = '700 22px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText(total ? rate + '%' : '—', x + w - 16, y + 46);
+    g.fillStyle = '#6f604b';
+    g.font = '500 12px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+    g.fillText(total ? '胜率' : '未上场', x + w - 16, y + 68);
+  }
+  g.textAlign = 'center';
+  g.fillStyle = '#6f604b';
+  g.font = '500 11px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  g.fillText('1v1 双人接力 · 手机/电脑按设备计算 · 清缓存清零', W / 2, H - 8);
+  lbTexture.needsUpdate = true;
+}function refreshLeaderboard() {
+  lbEntries = getLeaderboardEntries();
+  if (lbEntries.length !== lbCount) { lbCount = lbEntries.length; lbPage = 0; }
+  const pages = Math.max(1, Math.ceil(lbEntries.length / 8));
+  if (lbPage >= pages) lbPage = 0;
+  drawLeaderboard();
+}
+setInterval(() => {
+  if (lbEntries.length > 8) {
+    const pages = Math.ceil(lbEntries.length / 8);
+    lbPage = (lbPage + 1) % pages;
+    drawLeaderboard();
+  }
+}, 5000);
+function recordResultIfNeeded() {
+  if (state.mode !== 'team' || !state.winner || !profile) return;
+  if (profile.team !== 1 && profile.team !== 2) return;
+  if (!state.matchId || profile.lastMatchId === state.matchId) return;
+  if (!Array.isArray(state.matchPlayers) || state.matchPlayers.length !== 2) return;
+  if (!state.matchPlayers.includes(profile.playerId)) return;
+  if (state.winner === profile.team) profile.wins = (profile.wins || 0) + 1;
+  else profile.losses = (profile.losses || 0) + 1;
+  profile.lastMatchId = state.matchId;
+  profile.statsTs = Math.max(Date.now(), (profile.statsTs || 0) + 1);
+  const selfPeer = peers.get(net.id);
+  if (selfPeer) { selfPeer.wins = profile.wins; selfPeer.losses = profile.losses; selfPeer.statsTs = profile.statsTs; }
+  saveProfile();
+  publishMe();
+  setTimeout(publishMe, 300);
+  setTimeout(publishMe, 1200);
+}
 function updateAll() {
   markActive();
   updateNetUI();
+  recordResultIfNeeded();
   setStatus();
   const mb = $('modeBadge');
   mb.textContent = MODE_NAME[state.mode] || MODE_NAME.team;
@@ -1668,6 +1883,7 @@ function updateAll() {
   setGhost();
   syncAvatars();
   updateRoleLabels();
+  refreshLeaderboard();
   renderer.shadowMap.needsUpdate = true;
   maybeRenderEntry();
 }
@@ -1732,7 +1948,14 @@ function submitEntry(team) {
     const occ = seatOccupied(team);
     if (occ && occ.id !== net.id) { toast('这个座位已经有人了，换一个吧'); return; }
   }
-  profile = { name, team };
+  profile = {
+    name, team,
+    playerId: profile && profile.playerId ? profile.playerId : newPlayerId(),
+    wins: profile ? (profile.wins || 0) : 0,
+    losses: profile ? (profile.losses || 0) : 0,
+    lastMatchId: profile ? (profile.lastMatchId || '') : '',
+    statsTs: profile ? (profile.statsTs || 0) : 0
+  };
   saveProfile();
   $('entry').classList.add('hidden');
   entrySig = null;
@@ -1838,9 +2061,20 @@ function onWho(id, payload) {
   const name = sanitizeName(d.name) || '无名群友';
   let team = [0, 1, 2, 3, 4].includes(d.team) ? d.team : 0;
   if (!isFourSeat() && team > 2) team = 0;
+  const playerId = typeof d.playerId === 'string' && d.playerId ? d.playerId.slice(0, 64) : id;
   const old = peers.get(id);
   const joinedAt = old && old.joinedAt ? old.joinedAt : Date.now();
-  peers.set(id, { id, name, team, ts: Date.now(), joinedAt });
+  const incomingStatsTs = Number.isFinite(d.statsTs) ? d.statsTs : 0;
+  let wins = Number.isInteger(d.wins) && d.wins >= 0 ? Math.min(d.wins, 999999) : 0;
+  let losses = Number.isInteger(d.losses) && d.losses >= 0 ? Math.min(d.losses, 999999) : 0;
+  let statsTs = incomingStatsTs;
+  if (old && (old.statsTs || 0) > incomingStatsTs) {
+    wins = old.wins || 0; losses = old.losses || 0; statsTs = old.statsTs || 0;
+  }
+  if (id === net.id && profile) {
+    wins = profile.wins || 0; losses = profile.losses || 0; statsTs = profile.statsTs || 0;
+  }
+  peers.set(id, { id, name, team, playerId, wins, losses, statsTs, ts: Date.now(), joinedAt });
   if (id === net.id && d.force && profile && profile.team !== team) {
     profile.team = team;
     saveProfile();
@@ -1863,7 +2097,7 @@ function checkHostChange() {
     if (state.seq === 0) {
       if (Date.now() - net.connectedAt < 3000) { setTimeout(checkHostChange, 3000); return; }
       state.mode = 'team';
-      state.moves = []; state.owners = []; state.log = []; state.pending = null; state.winner = 0; state.winLine = null; state.turn = 1;
+      state.moves = []; state.owners = []; state.log = []; state.pending = null; state.winner = 0; state.winLine = null; state.turn = 1; state.matchId = newMatchId(); state.matchPlayers = [];
       rebuild(); normalizeProfileSeat();
       addLog('房间已创建，把链接发到群里吧');
       publishState();
@@ -1895,6 +2129,8 @@ function onState(payload) {
   state.owners = san.owners;
   state.turn = (Number.isInteger(d.turn) && d.turn >= 1 && d.turn <= 4) ? d.turn : 1;
   state.swapped = !!d.swapped;
+  state.matchId = typeof d.matchId === 'string' ? d.matchId : state.matchId;
+  state.matchPlayers = Array.isArray(d.matchPlayers) ? d.matchPlayers.filter(x => typeof x === 'string').slice(0, 4) : [];
   if (Array.isArray(d.log)) state.log = d.log.slice(-80);
   rebuild(); recomputeWinner();
   state.pending = null;
@@ -1928,7 +2164,7 @@ function sendEvt(o) {
 }
 function publishMe() {
   if (!net.client || !net.connected || !profile) return;
-  try { net.client.publish(whoTopic(net.id), JSON.stringify({ name: profile.name, team: profile.team }), { qos: 1, retain: true }); } catch (e) {}
+  try { net.client.publish(whoTopic(net.id), JSON.stringify({ name: profile.name, team: profile.team, playerId: profile.playerId, wins: profile.wins || 0, losses: profile.losses || 0, statsTs: profile.statsTs || 0 }), { qos: 1, retain: true }); } catch (e) {}
 }
 function announceLeave() {
   try { if (net.client && net.connected) net.client.publish(whoTopic(net.id), '', { qos: 1, retain: true }); } catch (e) {}
@@ -1952,6 +2188,13 @@ function hostApplyMove(key, pos) {
   if (state.winner || !r || !seat || seat !== currentColor() || !Number.isInteger(pos) || pos < 0 || pos > 224) { publishState(); return; }
   const [x, y] = posToXY(pos);
   if (board[y][x] !== 0) { publishState(); return; }
+  if (state.mode === 'team' && state.moves.length === 0) {
+    if (!state.matchId) state.matchId = newMatchId();
+    state.matchPlayers = [1, 2].map(s => {
+      const p = seatOccupied(s);
+      return p ? (p.playerId || p.id) : null;
+    }).filter(Boolean);
+  }
   state.moves.push(pos);
   state.owners.push(seat);
   state.pending = null;
@@ -2002,6 +2245,7 @@ function hostApplyReset(key) {
   if (key !== net.id) { publishState(); return; }
   const r = peers.get(key);
   state.moves = []; state.owners = []; state.pending = null; state.swapped = false;
+  state.matchId = newMatchId(); state.matchPlayers = [];
   rebuild(); state.winner = 0; state.winLine = null;
   state.turn = isFourSeat() ? firstSeat() : 1;
   addLog('「' + (r ? r.name : '?') + '」发起新局，' + (isFourSeat() ? seatName(state.turn) + '先手' : '黑方先行'));
@@ -2012,6 +2256,7 @@ function hostApplyMode(key, mode) {
   if (mode !== 'ffa' && mode !== 'team' && mode !== '2v2') return;
   state.mode = mode;
   state.moves = []; state.owners = []; state.pending = null; state.swapped = false;
+  state.matchId = newMatchId(); state.matchPlayers = [];
   rebuild(); state.winner = 0; state.winLine = null;
   state.turn = isFourSeat() ? firstSeat() : 1;
   const r = peers.get(key);
@@ -2028,6 +2273,7 @@ function publishState() {
   try {
     net.client.publish(T_STATE, JSON.stringify({
       seq: state.seq, host: net.id, mode: state.mode, swapped: state.swapped,
+      matchId: state.matchId, matchPlayers: state.matchPlayers,
       moves: state.moves, owners: state.owners, turn: state.turn,
       log: state.log.slice(-80)
     }), { qos: 1, retain: true });
@@ -2182,9 +2428,11 @@ function animate(now) {
 
 function exposeTest() {
   window.__wzq3d = {
-    state, peers, net, camera, renderer, scene, updateAll, avatars, poops, startAction, triggerSelfAction, pickWeighted,
+    state, peers, net, camera, renderer, scene, updateAll, avatars, poops, startAction, triggerSelfAction, pickWeighted, getLeaderboardEntries, refreshLeaderboard, recordResultIfNeeded, lbScreen,
     rebuild, recomputeWinner, teamOfSeat, teamLabel, seatLabel, currentColor, normalizeTurn, hostApplyMove,
     getProfile: () => profile,
+    publishMe,
+    getLeaderboardPage: () => lbPage,
     activateCell,
     stoneCount: () => stones.count,
     screenPoint: (x, y) => {
@@ -2197,6 +2445,7 @@ function exposeTest() {
 
 function initGame() {
   profile = loadProfile();
+  if (profile) saveProfile();
   const saved = loadSavedState();
   if (saved) {
     const mode = saved.mode === 'ffa' ? 'ffa' : saved.mode === '2v2' ? '2v2' : 'team';
@@ -2205,6 +2454,8 @@ function initGame() {
     state.log = Array.isArray(saved.log) ? saved.log.slice(-80) : [];
     state.turn = (Number.isInteger(saved.turn) && saved.turn >= 1 && saved.turn <= 4) ? saved.turn : 1;
     state.swapped = !!saved.swapped;
+    state.matchId = typeof saved.matchId === 'string' ? saved.matchId : state.matchId;
+    state.matchPlayers = Array.isArray(saved.matchPlayers) ? saved.matchPlayers.filter(x => typeof x === 'string').slice(0, 4) : [];
     rebuild(); recomputeWinner();
   }
   if (!profile) showEntry(false);
