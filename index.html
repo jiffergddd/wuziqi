@@ -199,6 +199,7 @@
   s.onerror = function () { loadMqtt(fallbacks.slice(1)); };
   document.head.appendChild(s);
 })([
+  './vendor/mqtt.min.js',
   'https://fastly.jsdelivr.net/npm/mqtt@4.3.7/dist/mqtt.min.js',
   'https://gcore.jsdelivr.net/npm/mqtt@4.3.7/dist/mqtt.min.js',
   'https://jsd.cdn.zzko.cn/npm/mqtt@4.3.7/dist/mqtt.min.js',
@@ -226,7 +227,7 @@ const MODE_INFO = [
   { id: 'ffa', name: '四人乱战', desc: '4 人每人一色，各自连成五子' },
   { id: '2v2', name: '2v2 黑褐 vs 白灰', desc: '4 人四色，黑+褐 vs 白+灰，同队两色合计五连' }
 ];
-const BROKERS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt'];
+const BROKERS = ['wss://broker.hivemq.com:8884/mqtt'];
 const T_STATE = ROOM_KEY + '/state';
 const T_EVT = ROOM_KEY + '/evt';
 const T_ACT = ROOM_KEY + '/act';
@@ -1770,20 +1771,20 @@ function connectBroker(idx) {
   if (!window.mqtt) return;
   if (idx >= BROKERS.length) {
     net.connected = false; net.allFailed = true; updateAll();
-    setTimeout(() => connectBroker(0), 15000);
+    setTimeout(() => connectBroker(0), 10000);
     return;
   }
   let c;
   try {
     c = mqtt.connect(BROKERS[idx], {
-      clientId: 'wzq3d_' + net.id, keepalive: 20, clean: true, reconnectPeriod: 0, connectTimeout: 8000,
+      clientId: 'wzq3d_' + net.id, keepalive: 20, clean: true, reconnectPeriod: 0, connectTimeout: 5000,
       will: { topic: whoTopic(net.id), payload: '', qos: 1, retain: true }
     });
   } catch (e) { setTimeout(() => connectBroker(idx + 1), 200); return; }
   net.client = c;
   net.connected = false;
   let everConnected = false, dead = false;
-  const guard = setTimeout(() => { if (!everConnected) onFail(); }, 11000);
+  const guard = setTimeout(() => { if (!everConnected) onFail(); }, 7000);
   const onFail = () => {
     if (dead) return;
     dead = true;
@@ -1802,6 +1803,7 @@ function connectBroker(idx) {
     net.connectedAt = Date.now();
     net.allFailed = false;
     c.subscribe(ROOM_KEY + '/#', { qos: 1 });
+    setTimeout(publishMe, 0);
     setTimeout(publishMe, 400);
     setTimeout(publishMe, 1600);
     setTimeout(publishMe, 4200);
@@ -1934,7 +1936,7 @@ function announceLeave() {
 function gcPeers() {
   const now = Date.now();
   const gone = [];
-  peers.forEach((r, id) => { if (id !== net.id && now - r.ts > 50000) { peers.delete(id); gone.push(r); } });
+  peers.forEach((r, id) => { if (id !== net.id && now - r.ts > 80000) { peers.delete(id); gone.push(r); } });
   if (gone.length) {
     scheduleEnforceTeamSeats();
     checkHostChange();
@@ -2123,6 +2125,7 @@ $('seatList').addEventListener('click', function (e) {
 $('entryCancel').addEventListener('click', () => $('entry').classList.add('hidden'));
 
 /* ================= 启动/渲染循环 ================= */
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { publishMe(); updateAll(); } });
 window.addEventListener('pagehide', announceLeave);
 window.addEventListener('beforeunload', announceLeave);
 
