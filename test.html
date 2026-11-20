@@ -3824,7 +3824,7 @@ spectatorMove = function (dt) {
   const side = (k.d || k.arrowright ? 1 : 0) - (k.a || k.arrowleft ? 1 : 0);
   if (!fwd && !side) return;
   const fx = Math.sin(camYaw), fz = Math.cos(camYaw);
-  const rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+  const rx = -Math.cos(camYaw), rz = Math.sin(camYaw);
   let dx = fx * fwd + rx * side, dz = fz * fwd + rz * side;
   const len = Math.hypot(dx, dz) || 1;
   dx /= len; dz /= len;
