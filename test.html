@@ -216,7 +216,6 @@
     <input id="entryName" maxlength="8" placeholder="你的名字" autocomplete="off" spellcheck="false">
     <button id="entryGo">进入院子</button>
     <button id="entryNet" class="ghost" style="display:none">联机开房</button>
-    <button id="entryCopy" class="ghost" style="display:none">复制邀请链接</button>
     <p class="entryStat" id="entryStat"></p>
     <p class="entryTip">前四个人上桌，后来的在院子里观战 · 观战者能走动</p>
   </div>
@@ -229,7 +228,6 @@
     <p class="lbstat" id="lbStat">未连接</p>
     <div class="lobbyBtns">
       <button id="lobbyStart">开始</button>
-      <button id="lobbyCopy" class="ghost">复制邀请链接</button>
     </div>
     <p class="lbtip" id="lobbyWait">等房主开局…</p>
   </div>
@@ -1547,6 +1545,11 @@ function spawnSeats(seed) {
   });
 
   renderRoster();
+  /* 一开始椅子都是空的，等玩家自己走过来坐 */
+  for (const a of animals) {
+    a.group.visible = false;
+    if (a.headUI) a.headUI.group.visible = false;
+  }
 }
 
 /* ================= 头顶名牌 + 血条 ================= */
@@ -2680,13 +2683,8 @@ document.getElementById('entryNet').addEventListener('click', () => {
   const code = Math.random().toString(36).slice(2, 8);
   location.href = location.origin + location.pathname + '?room=' + code;
 });
-document.getElementById('entryCopy').addEventListener('click', () => {
-  const url = location.origin + location.pathname + '?room=' + NET.room;
-  try { navigator.clipboard.writeText(url); document.getElementById('entryStat').textContent = '链接已复制'; } catch (e) { prompt('复制这个链接', url); }
-});
 document.getElementById('entryName').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitEntry(); });
 document.getElementById('lobbyStart').addEventListener('click', () => netStartGame());
-document.getElementById('lobbyCopy').addEventListener('click', () => netCopyLink());
 document.getElementById('btnHelp').addEventListener('click', () => {
   document.getElementById('help').classList.add('show');
 });
@@ -3049,6 +3047,8 @@ function netBoot() {
   const room = (PARAMS.get('room') || 'farm-main').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'farm-main';
   NET.on = true;
   NET.room = room;
+  const rosterEl = document.getElementById('roster');
+  if (rosterEl) rosterEl.style.display = 'none';
   NET.id = 'p' + Math.random().toString(36).slice(2, 8);
   NET.name = (PARAMS.get('name') || localStorage.getItem('farm_name') || ('玩家' + NET.id.slice(-3))).slice(0, 8);
   return true;
@@ -3115,6 +3115,8 @@ function netConnect() {
     NET.timer = setInterval(netPublishWho, 8000);
     netStatus('online');
     netLobby();
+    clearInterval(NET.gc);
+    NET.gc = setInterval(gcPeers, 5000);
   });
   c.on('message', (topic, payload) => {
     let msg = null;
@@ -3132,7 +3134,8 @@ function netConnect() {
 function netPublishWho() {
   if (!NET.connected) return;
   NET.client.publish(T_WHO(NET.id), JSON.stringify({
-    t: 'who', id: NET.id, name: NET.name, ts: NET.joined || (NET.joined = Date.now()), rate: rateOf(NET.name),
+    t: 'who', id: NET.id, name: NET.name,
+    joined: NET.joined || (NET.joined = Date.now()), ts: Date.now(), rate: rateOf(NET.name),
     seat: NET.mySeat,
     x: SPECT.animal ? +SPECT.animal.group.position.x.toFixed(2) : 0,
     z: SPECT.animal ? +SPECT.animal.group.position.z.toFixed(2) : 0,
@@ -3141,6 +3144,11 @@ function netPublishWho() {
 }
 
 function netOnWho(id, msg) {
+  if (msg && Date.now() - (msg.ts || 0) > 20000) {
+    /* 服务器上留着的旧心跳，早就不在线了 */
+    if (NET.peers.delete(id)) { netLobby(); syncChairAnimals(); }
+    return;
+  }
   if (msg) NET.peers.set(id, msg);
   else NET.peers.delete(id);
   netLobby();
@@ -3148,11 +3156,20 @@ function netOnWho(id, msg) {
 
 function netOrder() {
   const all = [{ id: NET.id, name: NET.name, ts: NET.joined || Date.now() }, ...NET.peers.values()];
-  all.sort((a, b) => (a.ts - b.ts) || String(a.id).localeCompare(String(b.id)));
+  all.sort((a, b) => ((a.joined || a.ts) - (b.joined || b.ts)) || String(a.id).localeCompare(String(b.id)));
   return all;
 }
 
 function netIsHost() { return netOrder()[0] && netOrder()[0].id === NET.id; }
+
+function gcPeers() {
+  const now = Date.now();
+  let changed = false;
+  for (const [id, p] of NET.peers) {
+    if (now - (p.ts || 0) > 20000) { NET.peers.delete(id); changed = true; }
+  }
+  if (changed) { netLobby(); syncChairAnimals(); netStatus('online'); }
+}
 
 function ensureSpectator() {
   if (!NET.connected) return;
@@ -3442,7 +3459,6 @@ function showEntry() {
   inp.value = MYNAME || ('玩家' + Math.floor(Math.random() * 900 + 100));
   document.getElementById('entryRoom').textContent = NET.on ? ('房间 · ' + NET.room) : '单机（没开联机）';
   document.getElementById('entryNet').style.display = NET.on ? 'none' : '';
-  document.getElementById('entryCopy').style.display = NET.on ? '' : 'none';
   el.classList.add('show');
   /* 手机不要自动聚焦：一弹键盘就把下面的按钮挡住了 */
   const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
