@@ -59,7 +59,12 @@
   .entryTip{margin:16px 0 0;font-size:11px;line-height:1.8;color:var(--bone-dim)}
   .entryCard button.ghost{background:rgba(255,255,255,.06);border-color:rgba(239,230,214,.24);font-weight:600;font-size:14px;padding:11px 0}
   .entryStat{margin:12px 0 0;font-size:11px;color:var(--amber-hot);min-height:14px}
-  .lbstat{margin:12px 0 0;font-size:11px;color:var(--bone-dim);min-height:14px}  .spectHint{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:8px 16px;border-radius:999px;
+  .lbstat{margin:12px 0 0;font-size:11px;color:var(--bone-dim);min-height:14px}  .sitBtn{position:fixed;left:50%;bottom:82px;transform:translateX(-50%);z-index:6;display:none;
+    padding:13px 26px;border-radius:999px;font-size:15px;font-weight:700;cursor:pointer;
+    border:1px solid rgba(255,179,92,.65);background:rgba(30,22,14,.86);color:var(--bone);
+    backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  .sitBtn.show{display:block}
+  .spectHint{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:8px 16px;border-radius:999px;
     background:rgba(12,14,17,.6);border:1px solid rgba(239,230,214,.16);font-size:12px;color:var(--bone-dim);
     opacity:0;transition:opacity .3s;pointer-events:none;z-index:4;white-space:nowrap}
   .spectHint.show{opacity:1}
@@ -3718,22 +3723,30 @@ function syncChairAnimals() {
   }
 }
 
-let sitHintEl = null;
+let sitBtn = null;
 function updateSitHint() {
-  if (!sitHintEl) {
-    sitHintEl = document.createElement('div');
-    sitHintEl.id = 'sitHint';
-    sitHintEl.className = 'sitHint';
-    document.body.appendChild(sitHintEl);
+  if (!sitBtn) {
+    sitBtn = document.createElement('button');
+    sitBtn.id = 'sitBtn';
+    sitBtn.className = 'sitBtn';
+    sitBtn.addEventListener('click', () => {
+      if (NET.mySeat >= 0) standUp(); else trySit();
+    });
+    document.body.appendChild(sitBtn);
   }
-  if (gameRunning()) { sitHintEl.classList.remove('show'); return; }
-  if (NET.mySeat >= 0) { sitHintEl.textContent = '按 Q 起身让座'; sitHintEl.classList.add('show'); return; }
+  const playing = gameRunning();
+  if (playing) { sitBtn.classList.remove('show'); return; }
+  if (NET.mySeat >= 0) {
+    sitBtn.textContent = '起身（Q）';
+    sitBtn.classList.add('show');
+    return;
+  }
   const near = nearestFreeSeat(2.2);
   if (near.seat >= 0 && NET.connected) {
-    sitHintEl.textContent = '按 E 坐到「' + SEAT_LABEL[near.seat] + '」的椅子上';
-    sitHintEl.classList.add('show');
+    sitBtn.textContent = '坐到「' + SEAT_LABEL[near.seat] + '」（E）';
+    sitBtn.classList.add('show');
   } else {
-    sitHintEl.classList.remove('show');
+    sitBtn.classList.remove('show');
   }
 }
 
@@ -3767,6 +3780,13 @@ window.addEventListener('keydown', (e) => {
 /* ================= 启动 ================= */
 resize();
 spawnSeats(Date.now() % 100000);
+NET.mySeat = -1;
+setTimeout(() => {
+  if (!SPECT.animal) {
+    spawnSpectatorAnimal();
+    applyMySeat();
+  }
+}, 2200);
 if (SIM) simulate(1).catch(e => {
   const el = document.getElementById('boot');
   el.classList.remove('gone');
