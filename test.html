@@ -2977,6 +2977,9 @@ window.addEventListener('pointerdown', (e) => {
 let camPush = 0, camPushTarget = 0, timeScale = 1;
 
 function updateCamera(dt, now) {
+  /* 站着 = 第三人称跟拍；坐下 = 打牌视角 */
+  if (SPECT.animal && NET.mySeat < 0) { spectatorCamera(); return; }
+  if (NET.mySeat >= 0) { camera.position.lerp(CAM_POS, 0.16); camera.lookAt(CAM_LOOK); return; }
   camPush += (camPushTarget - camPush) * Math.min(1, dt * 2.2);
   look.yaw += (look.tYaw - look.yaw) * Math.min(1, dt * 3.5);
   look.pitch += (look.tPitch - look.pitch) * Math.min(1, dt * 3.5);
