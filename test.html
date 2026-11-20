@@ -3219,11 +3219,12 @@ async function netStartGame() {
   const order = seatMap.map(s => ({ id: s.id, name: s.name, seat: s.seat }));
   if (order.length < 2) return;
   NET.started = true;
+  applyMySeat();
   document.getElementById('lobby').classList.remove('show');
   const seatNames = ['S', 'W', 'N', 'E'];
   G.players = order.map((peer, i) => {
-    const seat = SEATS[i];
-    const animal = animals[i];
+    const seat = SEATS[peer.seat];
+    const animal = animals[peer.seat];
     return {
       idx: i, seatIdx: peer.seat, pid: peer.id, remote: peer.id !== NET.id,
       human: true, local: peer.id === NET.id,
@@ -3232,7 +3233,7 @@ async function netStartGame() {
       ai: { bluff: 0.55, suspicion: 0.12 }
     };
   });
-  NET.mySeat = 0;
+  NET.mySeat = -1;
   animals.forEach((a, i) => {
     a.bound = G.players[i] || null;
     a.group.visible = i !== NET.mySeat;
@@ -3289,7 +3290,7 @@ function applyNetState(st) {
   G.over = st.over;
   G.phase = st.phase;
   const mine = st.players.find(p => p.pid === NET.id);
-  NET.mySeat = mine ? mine.seat : 0;
+  NET.mySeat = mine ? mine.seat : -1;
   applyCamSeat(NET.mySeat);
   if (!G.players.length) {
     G.players = st.players.map(p => ({
