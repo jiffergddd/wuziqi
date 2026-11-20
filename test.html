@@ -3132,7 +3132,11 @@ function netConnect() {
 function netPublishWho() {
   if (!NET.connected) return;
   NET.client.publish(T_WHO(NET.id), JSON.stringify({
-    t: 'who', id: NET.id, name: NET.name, ts: NET.joined || (NET.joined = Date.now()), rate: rateOf(NET.name)
+    t: 'who', id: NET.id, name: NET.name, ts: NET.joined || (NET.joined = Date.now()), rate: rateOf(NET.name),
+    seat: NET.mySeat,
+    x: SPECT.animal ? +SPECT.animal.group.position.x.toFixed(2) : 0,
+    z: SPECT.animal ? +SPECT.animal.group.position.z.toFixed(2) : 0,
+    ry: SPECT.animal ? +SPECT.animal.group.rotation.y.toFixed(2) : 0
   }), { qos: 1, retain: true });
 }
 
@@ -3152,12 +3156,9 @@ function netIsHost() { return netOrder()[0] && netOrder()[0].id === NET.id; }
 
 function ensureSpectator() {
   if (!NET.connected) return;
-  const order = netOrder();
-  const myIdx = order.findIndex(p => p.id === NET.id);
-  if (myIdx < 4) return;
-  if (SPECT.on) return;
-  NET.spectator = true;
-  spawnSpectatorAnimal();
+  if (!SPECT.animal) spawnSpectatorAnimal();
+  applyMySeat();
+  updateSitHint();
 }
 
 /* ---------- 大厅 ---------- */
@@ -3169,15 +3170,16 @@ function netLobby() {
   const meHost = netIsHost();
   document.getElementById('lobbyRoom').textContent = NET.room;
   document.getElementById('lobbyList').innerHTML = order.slice(0, 8).map((p, i) => {
-    const seated = i < 4;
-    return '<div class="lbrow' + (p.id === NET.id ? ' me' : '') + '"><i>' + (seated ? ('桌' + (i + 1)) : '观') + '</i><b>' + p.name + '</b>'
-      + (i === 0 ? '<em class="seat">房主</em>' : (seated ? '' : '<em class="watch">观战</em>')) + '</div>';
+    const s = (p.id === NET.id) ? NET.mySeat : (typeof p.seat === 'number' ? p.seat : -1);
+    const tag = s >= 0 ? ('坐' + SEAT_LABEL[s]) : '站';
+    return '<div class="lbrow' + (p.id === NET.id ? ' me' : '') + '"><i>' + tag + '</i><b>' + p.name + '</b>'
+      + (i === 0 ? '<em class="seat">房主</em>' : '') + '</div>';
   }).join('') + (order.length < 2
     ? '<p class="lbtip">只看到你自己。确认对面打开的是同一个房间链接（房间号要一致），把下面的链接发过去。</p>'
     : '');
   const btn = document.getElementById('lobbyStart');
   btn.style.display = meHost ? '' : 'none';
-  btn.disabled = order.length < 2;
+  btn.disabled = seatedList().length < 2;
   document.getElementById('lobbyWait').style.display = meHost ? 'none' : '';
   if (NET.connected) netStatus('online');
   if (meHost && order.length >= 2 && PARAMS.has('autostart') && !NET.started) { setTimeout(() => netStartGame(), 600); }
@@ -3191,7 +3193,8 @@ function netCopyLink() {
 
 /* ---------- 主机：开一桌 ---------- */
 async function netStartGame() {
-  const order = netOrder().slice(0, 4);
+  const seatMap = seatedList();
+  const order = seatMap.map(s => ({ id: s.id, name: s.name, seat: s.seat }));
   if (order.length < 2) return;
   NET.started = true;
   document.getElementById('lobby').classList.remove('show');
@@ -3200,7 +3203,7 @@ async function netStartGame() {
     const seat = SEATS[i];
     const animal = animals[i];
     return {
-      idx: i, pid: peer.id, remote: peer.id !== NET.id,
+      idx: i, seatIdx: peer.seat, pid: peer.id, remote: peer.id !== NET.id,
       human: true, local: peer.id === NET.id,
       alive: true, hand: [], gun: { pos: 1 + Math.floor(Math.random() * 6), count: 0 },
       name: peer.name, kind: animal.kind, seat, animal,
@@ -3229,7 +3232,7 @@ function netPublishState(phase) {
     claim: G.lastClaim ? { by: G.players[G.lastClaim.by].pid, count: G.lastClaim.count } : null,
     pile: G.pile.length,
     players: G.players.map(p => ({
-      pid: p.pid, name: p.name, seat: p.idx, alive: p.alive,
+      pid: p.pid, name: p.name, seat: (typeof p.seatIdx === 'number' ? p.seatIdx : p.idx), alive: p.alive,
       hp: p.animal.headUI ? p.animal.headUI.hp : 100,
       count: p.hand.length
     }))
@@ -3608,6 +3611,143 @@ window.addEventListener('pointerup', () => {
   SPECT.keys.w = SPECT.keys.a = SPECT.keys.s = SPECT.keys.d = false;
 });
 
+
+/* ================= 自由落座 ================= */
+const SEAT_LABEL = ['南', '西', '北', '东'];
+
+function seatOfPid(pid) {
+  if (pid === NET.id) return NET.mySeat;
+  const p = NET.peers.get(pid);
+  return (p && typeof p.seat === 'number') ? p.seat : -1;
+}
+function seatTaken(seat, exceptId) {
+  if (NET.mySeat === seat && NET.id !== exceptId) return true;
+  for (const p of NET.peers.values()) {
+    if (p.id !== exceptId && p.seat === seat) return true;
+  }
+  return false;
+}
+function nearestFreeSeat(maxD) {
+  const me = SPECT.animal ? SPECT.animal.group.position : null;
+  let best = -1, bd = maxD === undefined ? 999 : maxD;
+  for (let i = 0; i < 4; i++) {
+    if (seatTaken(i, NET.id)) continue;
+    const s = SEATS[i];
+    const d = me ? Math.hypot(me.x - s.pos.x, me.z - s.pos.z) : 0;
+    if (d < bd) { bd = d; best = i; }
+  }
+  return { seat: best, dist: bd };
+}
+function seatedList() {
+  const all = [{ id: NET.id, name: NET.name, seat: NET.mySeat }];
+  for (const p of NET.peers.values()) all.push({ id: p.id, name: p.name, seat: (typeof p.seat === 'number' ? p.seat : -1) });
+  return all.filter(p => p.seat >= 0 && p.seat < 4).sort((a, b) => a.seat - b.seat);
+}
+function gameRunning() { return G.players.length > 0 && !G.over; }
+
+function trySit(want) {
+  if (NET.mySeat >= 0) return;
+  if (gameRunning()) { showBanner('牌局进行中，先别入座', 900); return; }
+  let seat = (typeof want === 'number' && want >= 0 && !seatTaken(want, NET.id)) ? want : nearestFreeSeat(2.2).seat;
+  if (seat < 0) { showBanner('附近没有空椅子，走近一点', 900); return; }
+  NET.mySeat = seat;
+  applyMySeat();
+  netPublishWho();
+  Audio2.creak();
+  showBanner('落座 · ' + SEAT_LABEL[seat], 800);
+}
+function standUp() {
+  if (NET.mySeat < 0) return;
+  if (gameRunning()) { showBanner('牌局进行中，不能起身', 900); return; }
+  const seat = NET.mySeat;
+  NET.mySeat = -1;
+  if (SPECT.animal) {
+    const s = SEATS[seat];
+    SPECT.animal.group.position.set(s.pos.x * 1.5, 0, s.pos.z * 1.5);
+  }
+  applyMySeat();
+  netPublishWho();
+  Audio2.creak();
+  showBanner('起身', 700);
+}
+
+function applyMySeat() {
+  const seated = NET.mySeat >= 0;
+  if (SPECT.animal) {
+    SPECT.animal.group.visible = !seated;
+    if (SPECT.animal.headUI) SPECT.animal.headUI.group.visible = !seated;
+  }
+  if (seated) applyCamSeat(NET.mySeat);
+  syncChairAnimals();
+  updateSitHint();
+}
+
+function syncChairAnimals() {
+  for (let i = 0; i < 4; i++) {
+    const a = animals[i];
+    if (!a) continue;
+    if (i === NET.mySeat) {
+      a.group.visible = false;
+      if (a.headUI) a.headUI.group.visible = false;
+      continue;
+    }
+    let holder = null;
+    for (const p of NET.peers.values()) if (p.seat === i) holder = p;
+    const show = !!holder;
+    a.group.visible = show;
+    if (a.headUI) {
+      a.headUI.group.visible = show;
+      if (show) setAnimalName(a, holder.name || '玩家');
+    }
+  }
+}
+
+let sitHintEl = null;
+function updateSitHint() {
+  if (!sitHintEl) {
+    sitHintEl = document.createElement('div');
+    sitHintEl.id = 'sitHint';
+    sitHintEl.className = 'sitHint';
+    document.body.appendChild(sitHintEl);
+  }
+  if (gameRunning()) { sitHintEl.classList.remove('show'); return; }
+  if (NET.mySeat >= 0) { sitHintEl.textContent = '按 Q 起身让座'; sitHintEl.classList.add('show'); return; }
+  const near = nearestFreeSeat(2.2);
+  if (near.seat >= 0 && NET.connected) {
+    sitHintEl.textContent = '按 E 坐到「' + SEAT_LABEL[near.seat] + '」的椅子上';
+    sitHintEl.classList.add('show');
+  } else {
+    sitHintEl.classList.remove('show');
+  }
+}
+
+const seatRings = [];
+for (let i = 0; i < 4; i++) {
+  const s = SEATS[i];
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.32, 0.42, 24),
+    new THREE.MeshBasicMaterial({ color: 0xffb35c, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(s.pos.x * 1.08, 0.02, s.pos.z * 1.08);
+  ring.visible = false;
+  scene.add(ring);
+  seatRings.push(ring);
+}
+function updateSeatRings(now) {
+  for (let i = 0; i < 4; i++) {
+    const free = !seatTaken(i, null) && !gameRunning() && NET.connected;
+    seatRings[i].visible = free;
+    if (free) seatRings[i].material.opacity = 0.18 + Math.abs(Math.sin(now * 0.002 + i)) * 0.18;
+  }
+}
+
+window.addEventListener('keydown', (e) => {
+  const k = (e.key || '').toLowerCase();
+  if (!NET.connected) return;
+  if (k === 'e') trySit();
+  if (k === 'q') standUp();
+});
 /* ================= 启动 ================= */
 resize();
 spawnSeats(Date.now() % 100000);
@@ -3634,6 +3774,8 @@ function frame(now) {
   idleAnimals(dt, now);
   if (SPECT.on) spectatorMove(dt);
   updateSpectators(dt);
+  updateSeatRings(now);
+  if (NET.connected && (now - (updateSitHint.t || 0)) > 250) { updateSitHint.t = now; updateSitHint(); }
   updateHeadUI();
   updateAtmosphere(dt, now);
   updateCamera(dt, now);
