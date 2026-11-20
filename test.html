@@ -3442,7 +3442,9 @@ function showEntry() {
   document.getElementById('entryNet').style.display = NET.on ? 'none' : '';
   document.getElementById('entryCopy').style.display = NET.on ? '' : 'none';
   el.classList.add('show');
-  setTimeout(() => { try { inp.focus(); } catch (e) {} }, 300);
+  /* 手机不要自动聚焦：一弹键盘就把下面的按钮挡住了 */
+  const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  if (!coarse) setTimeout(() => { try { inp.focus(); } catch (e) {} }, 300);
 }
 
 function enterAs(name) {
