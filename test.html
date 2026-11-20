@@ -44,7 +44,25 @@
     background:radial-gradient(ellipse at 50% 56%,rgba(0,0,0,0) 30%,rgba(46,0,0,.62) 100%)}
   #pulse.on{opacity:1;animation:pulseBeat 1.15s ease-in-out infinite}
   @keyframes pulseBeat{0%,100%{opacity:.3}16%{opacity:.85}34%{opacity:.35}52%{opacity:.7}}
-  .lobby{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:10;
+  .entry{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:11;
+    background:radial-gradient(circle at 50% 42%,rgba(23,19,16,.62),rgba(8,9,10,.9));transition:opacity .35s;backdrop-filter:blur(2px)}
+  .entry.show{opacity:1;pointer-events:auto}
+  .entry:not(.show){opacity:0;pointer-events:none}
+  .entryCard{width:320px;max-width:86vw;text-align:center}
+  .entryCard h2{margin:0 0 6px;font-size:26px;letter-spacing:.18em}
+  .entrySub{margin:0 0 22px;font-size:12px;color:var(--bone-dim);letter-spacing:.12em}
+  .entryCard input{width:100%;padding:13px 14px;border-radius:12px;font-size:16px;text-align:center;
+    background:rgba(255,255,255,.06);border:1px solid rgba(239,230,214,.22);color:var(--bone);outline:none}
+  .entryCard input:focus{border-color:rgba(255,179,92,.7)}
+  .entryCard button{width:100%;margin-top:12px;padding:14px 0;border-radius:12px;font-size:16px;font-weight:700;
+    letter-spacing:.1em;cursor:pointer;border:1px solid rgba(255,179,92,.6);background:rgba(255,179,92,.2);color:var(--bone)}
+  .entryTip{margin:16px 0 0;font-size:11px;line-height:1.8;color:var(--bone-dim)}
+  .spectHint{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:8px 16px;border-radius:999px;
+    background:rgba(12,14,17,.6);border:1px solid rgba(239,230,214,.16);font-size:12px;color:var(--bone-dim);
+    opacity:0;transition:opacity .3s;pointer-events:none;z-index:4;white-space:nowrap}
+  .spectHint.show{opacity:1}
+  .lbrow em.seat{color:var(--amber-hot)}
+  .lbrow em.watch{color:#8fa7c8}  .lobby{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:10;
     background:rgba(6,6,8,.72);opacity:0;pointer-events:none;transition:opacity .3s}
   .lobby.show{opacity:1;pointer-events:auto}
   .lobbyCard{width:360px;max-width:88vw;padding:24px 26px;border-radius:18px;background:rgba(18,18,20,.95);
@@ -189,6 +207,16 @@
     <button id="btnHelpClose">知道了</button>
   </div>
 </div>
+<div class="entry" id="entry">
+  <div class="entryCard">
+    <h2>骗子农场</h2>
+    <p class="entrySub" id="entryRoom">单机</p>
+    <input id="entryName" maxlength="8" placeholder="你的名字" autocomplete="off" spellcheck="false">
+    <button id="entryGo">进入院子</button>
+    <p class="entryTip">前四个人上桌，后来的在院子里观战 · 观战者能走动</p>
+  </div>
+</div>
+<div class="spectHint" id="spectHint">观战中 · WASD 或拖动屏幕走动</div>
 <div class="lobby" id="lobby">
   <div class="lobbyCard">
     <h3>联机房间 <span id="lobbyRoom">—</span></h3>
@@ -1731,7 +1759,7 @@ function buildLeaderboard() {
   lamp.position.set(0, 1.6, 0.8);
   group.add(lamp);
 
-  group.position.set(0, 2.46, -6.55);
+  group.position.set(0, 2.28, -6.55);
   scene.add(group);
 }
 
@@ -2641,6 +2669,8 @@ HUD.challenge.addEventListener('click', () => {
   resolveHuman({ type: 'challenge' });
 });
 
+document.getElementById('entryGo').addEventListener('click', submitEntry);
+document.getElementById('entryName').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitEntry(); });
 document.getElementById('lobbyStart').addEventListener('click', () => netStartGame());
 document.getElementById('lobbyCopy').addEventListener('click', () => netCopyLink());
 document.getElementById('btnHelp').addEventListener('click', () => {
@@ -2862,7 +2892,7 @@ async function simulate(n) {
   el.textContent = 'SIM ' + lines.join(' | ');
 }
 /* ---------- 开一局 ---------- */
-async function newGame() {
+async function newGame(localName) {
   HUD.over.classList.remove('show');
   G.players = animals.map((a, i) => ({
     idx: i,
@@ -2876,6 +2906,15 @@ async function newGame() {
     gun: { pos: 1 + Math.floor(Math.random() * 6), count: 0 },
     ai: { bluff: 0.45 + Math.random() * 0.4, suspicion: Math.random() * 0.26 }
   }));
+  if (localName) {
+    const me = G.players.find(p => p.human);
+    if (me) {
+      me.name = localName;
+      me.animal.name = localName;
+      setAnimalName(me.animal, localName);
+      renderRoster();
+    }
+  }
   G.round = 0;
   G.pile = [];
   G.lastClaim = null;
@@ -2973,6 +3012,7 @@ const T_WHO = id => 'farm/' + NET.room + '/who/' + id;
 const T_STATE = () => 'farm/' + NET.room + '/state';
 const T_ACT = () => 'farm/' + NET.room + '/act';
 const T_PRIV = pid => 'farm/' + NET.room + '/priv/' + pid;
+const T_MV = () => 'farm/' + NET.room + '/mv';
 
 function loadMqttScript(cb) {
   if (window.mqtt) return cb();
@@ -2998,8 +3038,6 @@ function netBoot() {
   NET.room = room;
   NET.id = 'p' + Math.random().toString(36).slice(2, 8);
   NET.name = (PARAMS.get('name') || localStorage.getItem('farm_name') || ('玩家' + NET.id.slice(-3))).slice(0, 8);
-  loadMqttScript(netConnect);
-  setTimeout(netLobby, 400);
   return true;
 }
 
@@ -3015,7 +3053,7 @@ function netConnect() {
   NET.client = c;
   c.on('connect', () => {
     NET.connected = true;
-    c.subscribe([T_STATE(), T_ACT(), T_WHO('+'), T_PRIV(NET.id)], { qos: 1 });
+    c.subscribe([T_STATE(), T_ACT(), T_WHO('+'), T_PRIV(NET.id), T_MV()], { qos: 1 });
     netPublishWho();
     clearInterval(NET.timer);
     NET.timer = setInterval(netPublishWho, 8000);
@@ -3026,6 +3064,7 @@ function netConnect() {
     try { msg = JSON.parse(new TextDecoder().decode(payload)); } catch (e) { msg = null; }
     if (topic === T_STATE()) return netOnState(msg);
     if (topic === T_ACT()) return netOnAct(msg);
+    if (topic === T_MV()) return netOnMv(msg);
     if (topic === T_PRIV(NET.id)) return netOnHand(msg);
     const who = 'farm/' + NET.room + '/who/';
     if (topic.indexOf(who) === 0) return netOnWho(topic.slice(who.length), payload.length ? msg : null);
@@ -3054,6 +3093,16 @@ function netOrder() {
 
 function netIsHost() { return netOrder()[0] && netOrder()[0].id === NET.id; }
 
+function ensureSpectator() {
+  if (!NET.connected) return;
+  const order = netOrder();
+  const myIdx = order.findIndex(p => p.id === NET.id);
+  if (myIdx < 4) return;
+  if (SPECT.on) return;
+  NET.spectator = true;
+  spawnSpectatorAnimal();
+}
+
 /* ---------- 大厅 ---------- */
 function netLobby() {
   const el = document.getElementById('lobby');
@@ -3062,10 +3111,11 @@ function netLobby() {
   const order = netOrder();
   const meHost = netIsHost();
   document.getElementById('lobbyRoom').textContent = NET.room;
-  document.getElementById('lobbyList').innerHTML = order.slice(0, 4).map((p, i) =>
-    '<div class="lbrow' + (p.id === NET.id ? ' me' : '') + '"><i>' + (i + 1) + '</i><b>' + p.name + '</b>'
-    + (i === 0 ? '<em>房主</em>' : '') + '</div>'
-  ).join('') + (order.length < 2 ? '<p class="lbtip">至少两个人才能开局，把链接发给朋友</p>' : '');
+  document.getElementById('lobbyList').innerHTML = order.slice(0, 8).map((p, i) => {
+    const seated = i < 4;
+    return '<div class="lbrow' + (p.id === NET.id ? ' me' : '') + '"><i>' + (seated ? ('桌' + (i + 1)) : '观') + '</i><b>' + p.name + '</b>'
+      + (i === 0 ? '<em class="seat">房主</em>' : (seated ? '' : '<em class="watch">观战</em>')) + '</div>';
+  }).join('') + (order.length < 2 ? '<p class="lbtip">至少两个人才能开局，把链接发给朋友</p>' : '');
   const btn = document.getElementById('lobbyStart');
   btn.style.display = meHost ? '' : 'none';
   btn.disabled = order.length < 2;
@@ -3316,6 +3366,184 @@ function makeHeadLabelTex(name) {
   });
 }
 
+/* ================= 入场 / 观战 ================= */
+let MYNAME = '';
+try { MYNAME = (localStorage.getItem('farm_name') || '').trim(); } catch (e) { MYNAME = ''; }
+
+const SPECT = { on: false, animal: null, keys: {}, lastPub: 0, others: new Map(), mine: null };
+
+function showEntry() {
+  const el = document.getElementById('entry');
+  if (!el) return;
+  const inp = document.getElementById('entryName');
+  inp.value = MYNAME || ('玩家' + Math.floor(Math.random() * 900 + 100));
+  document.getElementById('entryRoom').textContent = NET.on ? ('房间 · ' + NET.room) : '单机';
+  el.classList.add('show');
+  setTimeout(() => { try { inp.focus(); } catch (e) {} }, 300);
+}
+
+function enterAs(name) {
+  MYNAME = name;
+  try { localStorage.setItem('farm_name', name); } catch (e) {}
+  document.getElementById('entry').classList.remove('show');
+  if (NET.on) {
+    NET.name = name;
+    loadMqttScript(netConnect);
+  } else {
+    newGame(name);
+  }
+}
+
+function submitEntry() {
+  const inp = document.getElementById('entryName');
+  const name = (inp.value || '').trim().replace(/\s+/g, ' ').slice(0, 8) || '无名';
+  enterAs(name);
+}
+
+/* ---------- 观战者：院子里溜达 ---------- */
+function spawnSpectatorAnimal() {
+  const kind = pick(Math.random, ['cat', 'dog', 'pig', 'cow', 'goat']);
+  const rng = mulberry((Math.random() * 1e6) | 0);
+  const a = buildAnimal(kind, rng);
+  const ang = Math.random() * 6.283;
+  const r = 3.4 + Math.random() * 1.6;
+  a.group.position.set(Math.cos(ang) * r, 0, Math.sin(ang) * r);
+  a.group.rotation.y = ang + Math.PI;
+  a.kind = kind;
+  a.name = MYNAME;
+  scene.add(a.group);
+  attachHeadUI(a);
+  if (a.headUI) {
+    setAnimalName(a, MYNAME);
+    const bar = a.headUI.bar;
+    if (bar) bar.visible = false;
+  }
+  SPECT.animal = a;
+  SPECT.on = true;
+  a.group.visible = true;
+  document.getElementById('spectHint').classList.add('show');
+  setClaim('');
+  HUD.acts.classList.remove('show');
+}
+
+function spectatorMove(dt) {
+  const a = SPECT.animal;
+  if (!a) return;
+  const k = SPECT.keys;
+  let dx = 0, dz = 0;
+  if (k.w || k.arrowup) dz -= 1;
+  if (k.s || k.arrowdown) dz += 1;
+  if (k.a || k.arrowleft) dx -= 1;
+  if (k.d || k.arrowright) dx += 1;
+  if (!dx && !dz) return;
+  const len = Math.hypot(dx, dz) || 1;
+  dx /= len; dz /= len;
+  const speed = (k.shift ? 3.6 : 2.1);
+  let nx = a.group.position.x + dx * speed * dt;
+  let nz = a.group.position.z + dz * speed * dt;
+  /* 别走进桌子，也别跑出院子 */
+  const inTable = Math.abs(nx) < 1.5 && Math.abs(nz) < 1.05;
+  if (inTable) { nx = a.group.position.x; nz = a.group.position.z; }
+  const r = Math.hypot(nx, nz);
+  if (r > 6.4) { nx = nx / r * 6.4; nz = nz / r * 6.4; }
+  a.group.position.x = nx;
+  a.group.position.z = nz;
+  const target = Math.atan2(dx, dz);
+  let d = target - a.group.rotation.y;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  a.group.rotation.y += d * Math.min(1, dt * 8);
+  a.t = (a.t || 0) + dt;
+
+  if (NET.connected && NET.name && Date.now() - SPECT.lastPub > 120) {
+    SPECT.lastPub = Date.now();
+    netPublishMv(a);
+  }
+}
+
+function netPublishMv(a) {
+  if (!NET.client) return;
+  NET.client.publish(T_MV(), JSON.stringify({
+    t: 'mv', id: NET.id, name: MYNAME, kind: a.kind,
+    x: +a.group.position.x.toFixed(2), z: +a.group.position.z.toFixed(2), ry: +a.group.rotation.y.toFixed(2)
+  }), { qos: 0 });
+}
+
+function netOnMv(msg) {
+  if (!msg || msg.t !== 'mv' || msg.id === NET.id) return;
+  if (NET.peers.size === 0) return;
+  let e = SPECT.others.get(msg.id);
+  if (!e) {
+    const rng = mulberry(msg.id.length * 977 + 13);
+    const a = buildAnimal(msg.kind || 'cat', rng);
+    a.group.position.set(msg.x, 0, msg.z);
+    a.group.rotation.y = msg.ry || 0;
+    a.name = msg.name || '观战者';
+    scene.add(a.group);
+    attachHeadUI(a);
+    if (a.headUI) {
+      setAnimalName(a, a.name);
+      if (a.headUI.bar) a.headUI.bar.visible = false;
+    }
+    e = { animal: a, tx: msg.x, tz: msg.z };
+    SPECT.others.set(msg.id, e);
+  }
+  e.tx = msg.x;
+  e.tz = msg.z;
+  e.animal.group.rotation.y = msg.ry || 0;
+}
+
+function updateSpectators(dt) {
+  for (const e of SPECT.others.values()) {
+    const a = e.animal;
+    a.group.position.x += (e.tx - a.group.position.x) * Math.min(1, dt * 8);
+    a.group.position.z += (e.tz - a.group.position.z) * Math.min(1, dt * 8);
+  }
+}
+
+function spectatorCamera() {
+  const a = SPECT.animal;
+  if (!a) return;
+  const ry = a.group.rotation.y;
+  const back = new THREE.Vector3(Math.sin(ry), 0, Math.cos(ry)).multiplyScalar(-2.6);
+  const target = new THREE.Vector3(a.group.position.x + back.x, 1.62, a.group.position.z + back.z);
+  camera.position.lerp(target, 0.12);
+  camera.lookAt(a.group.position.x, a.group.position.y + 1.05, a.group.position.z);
+}
+
+/* ---------- 键位 ---------- */
+window.addEventListener('keydown', (e) => {
+  const k = (e.key || '').toLowerCase();
+  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift'].includes(k)) {
+    SPECT.keys[k] = true;
+    if (SPECT.on) e.preventDefault();
+  }
+});
+window.addEventListener('keyup', (e) => {
+  const k = (e.key || '').toLowerCase();
+  if (k in SPECT.keys) SPECT.keys[k] = false;
+});
+/* 手机：按住屏幕任意处，往哪边拖就往哪边走 */
+let touchMove = null;
+window.addEventListener('pointerdown', (e) => {
+  if (!SPECT.on || e.pointerType !== 'touch') return;
+  touchMove = { x: e.clientX, y: e.clientY };
+});
+window.addEventListener('pointermove', (e) => {
+  if (!SPECT.on || !touchMove || e.pointerType !== 'touch') return;
+  const dx = e.clientX - touchMove.x, dy = e.clientY - touchMove.y;
+  const m = Math.hypot(dx, dy);
+  if (m < 12) return;
+  SPECT.keys.d = dx > 12;
+  SPECT.keys.a = dx < -12;
+  SPECT.keys.s = dy > 12;
+  SPECT.keys.w = dy < -12;
+});
+window.addEventListener('pointerup', () => {
+  touchMove = null;
+  SPECT.keys.w = SPECT.keys.a = SPECT.keys.s = SPECT.keys.d = false;
+});
+
 /* ================= 启动 ================= */
 resize();
 spawnSeats(Date.now() % 100000);
@@ -3324,7 +3552,13 @@ if (SIM) simulate(1).catch(e => {
   el.classList.remove('gone');
   el.textContent = 'SIM ERR ' + ((e && e.stack) || e);
 });
-else if (!netBoot()) newGame();
+else {
+  netBoot();
+  const preset = (PARAMS.get('name') || '').trim().slice(0, 8);
+  if (preset) MYNAME = preset;
+  if (preset || PARAMS.has('auto') || PARAMS.has('fast')) enterAs(MYNAME || '测试');
+  else showEntry();
+}
 
 let last = performance.now();
 let booted = false;
@@ -3334,6 +3568,8 @@ function frame(now) {
   last = now;
   updateTweens(dt);
   idleAnimals(dt, now);
+  if (SPECT.on) spectatorMove(dt);
+  updateSpectators(dt);
   updateHeadUI();
   updateAtmosphere(dt, now);
   updateCamera(dt, now);
