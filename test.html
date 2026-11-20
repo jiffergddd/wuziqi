@@ -57,7 +57,9 @@
   .entryCard button{width:100%;margin-top:12px;padding:14px 0;border-radius:12px;font-size:16px;font-weight:700;
     letter-spacing:.1em;cursor:pointer;border:1px solid rgba(255,179,92,.6);background:rgba(255,179,92,.2);color:var(--bone)}
   .entryTip{margin:16px 0 0;font-size:11px;line-height:1.8;color:var(--bone-dim)}
-  .spectHint{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:8px 16px;border-radius:999px;
+  .entryCard button.ghost{background:rgba(255,255,255,.06);border-color:rgba(239,230,214,.24);font-weight:600;font-size:14px;padding:11px 0}
+  .entryStat{margin:12px 0 0;font-size:11px;color:var(--amber-hot);min-height:14px}
+  .lbstat{margin:12px 0 0;font-size:11px;color:var(--bone-dim);min-height:14px}  .spectHint{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:8px 16px;border-radius:999px;
     background:rgba(12,14,17,.6);border:1px solid rgba(239,230,214,.16);font-size:12px;color:var(--bone-dim);
     opacity:0;transition:opacity .3s;pointer-events:none;z-index:4;white-space:nowrap}
   .spectHint.show{opacity:1}
@@ -68,7 +70,7 @@
   .lobbyCard{width:360px;max-width:88vw;padding:24px 26px;border-radius:18px;background:rgba(18,18,20,.95);
     border:1px solid rgba(239,230,214,.16);box-shadow:0 30px 80px rgba(0,0,0,.65)}
   .lobbyCard h3{margin:0 0 16px;font-size:16px;letter-spacing:.06em;display:flex;justify-content:space-between;align-items:center}
-  .lobbyCard h3 span{color:var(--amber-hot);font-size:13px;letter-spacing:.1em}
+  .lobbyCard h3 span{color:var(--amber-hot);font-size:15px;letter-spacing:.18em;font-weight:800}
   .lobbyList{display:flex;flex-direction:column;gap:8px;min-height:60px}
   .lbrow{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:11px;
     background:rgba(255,255,255,.04);border:1px solid rgba(239,230,214,.1);font-size:14px}
@@ -213,6 +215,9 @@
     <p class="entrySub" id="entryRoom">单机</p>
     <input id="entryName" maxlength="8" placeholder="你的名字" autocomplete="off" spellcheck="false">
     <button id="entryGo">进入院子</button>
+    <button id="entryNet" class="ghost" style="display:none">联机开房</button>
+    <button id="entryCopy" class="ghost" style="display:none">复制邀请链接</button>
+    <p class="entryStat" id="entryStat"></p>
     <p class="entryTip">前四个人上桌，后来的在院子里观战 · 观战者能走动</p>
   </div>
 </div>
@@ -221,6 +226,7 @@
   <div class="lobbyCard">
     <h3>联机房间 <span id="lobbyRoom">—</span></h3>
     <div id="lobbyList" class="lobbyList"></div>
+    <p class="lbstat" id="lbStat">未连接</p>
     <div class="lobbyBtns">
       <button id="lobbyStart">开始</button>
       <button id="lobbyCopy" class="ghost">复制邀请链接</button>
@@ -2670,6 +2676,14 @@ HUD.challenge.addEventListener('click', () => {
 });
 
 document.getElementById('entryGo').addEventListener('click', submitEntry);
+document.getElementById('entryNet').addEventListener('click', () => {
+  const code = Math.random().toString(36).slice(2, 8);
+  location.href = location.origin + location.pathname + '?room=' + code;
+});
+document.getElementById('entryCopy').addEventListener('click', () => {
+  const url = location.origin + location.pathname + '?room=' + NET.room;
+  try { navigator.clipboard.writeText(url); document.getElementById('entryStat').textContent = '链接已复制'; } catch (e) { prompt('复制这个链接', url); }
+});
 document.getElementById('entryName').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitEntry(); });
 document.getElementById('lobbyStart').addEventListener('click', () => netStartGame());
 document.getElementById('lobbyCopy').addEventListener('click', () => netCopyLink());
@@ -3041,22 +3055,66 @@ function netBoot() {
   return true;
 }
 
+const BROKERS = [
+  'wss://broker.emqx.io:8084/mqtt',
+  'wss://broker.hivemq.com:8884/mqtt',
+  'wss://test.mosquitto.org:8081/mqtt'
+];
+let brokerIdx = 0;
+
+function netStatus(s) {
+  NET.status = s;
+  const el = document.getElementById('lbStat');
+  const map = {
+    connecting: '正在连服务器…',
+    online: '已连上 · ' + (netOrder().length) + ' 人在房间',
+    error: '连不上服务器，正在换一个…',
+    off: '未连接'
+  };
+  if (el) el.textContent = map[s] || s;
+  const en = document.getElementById('entryStat');
+  if (en) en.textContent = map[s] || s;
+}
+
 function netConnect() {
+  if (!window.mqtt) return;
+  netStatus('connecting');
   let c;
   try {
-    c = mqtt.connect(NET_BROKER, {
-      clientId: 'farm_' + NET.room + '_' + NET.id,
-      keepalive: 25, clean: true, reconnectPeriod: 2500, connectTimeout: 9000,
+    c = mqtt.connect(BROKERS[brokerIdx], {
+      clientId: 'farm_' + NET.room + '_' + NET.id + '_' + brokerIdx,
+      keepalive: 25, clean: true, reconnectPeriod: 0, connectTimeout: 8000,
       will: { topic: T_WHO(NET.id), payload: '', qos: 1, retain: true }
     });
-  } catch (e) { return; }
+  } catch (e) {
+    netStatus('error');
+    setTimeout(() => { brokerIdx = (brokerIdx + 1) % BROKERS.length; netConnect(); }, 800);
+    return;
+  }
   NET.client = c;
+  let ever = false, dead = false;
+  const guard = setTimeout(() => { if (!ever) fail(); }, 9000);
+
+  function fail() {
+    if (dead) return;
+    dead = true;
+    clearTimeout(guard);
+    NET.connected = false;
+    try { c.end(true); } catch (e) {}
+    netStatus('error');
+    brokerIdx = (brokerIdx + 1) % BROKERS.length;
+    setTimeout(netConnect, 1000);
+  }
+
   c.on('connect', () => {
+    ever = true;
+    clearTimeout(guard);
     NET.connected = true;
     c.subscribe([T_STATE(), T_ACT(), T_WHO('+'), T_PRIV(NET.id), T_MV()], { qos: 1 });
     netPublishWho();
     clearInterval(NET.timer);
     NET.timer = setInterval(netPublishWho, 8000);
+    netStatus('online');
     netLobby();
   });
   c.on('message', (topic, payload) => {
@@ -3069,9 +3127,9 @@ function netConnect() {
     const who = 'farm/' + NET.room + '/who/';
     if (topic.indexOf(who) === 0) return netOnWho(topic.slice(who.length), payload.length ? msg : null);
   });
-  c.on('error', () => { NET.connected = false; });
+  c.on('error', fail);
+  c.on('close', () => { if (ever) fail(); });
 }
-
 function netPublishWho() {
   if (!NET.connected) return;
   NET.client.publish(T_WHO(NET.id), JSON.stringify({
@@ -3115,11 +3173,14 @@ function netLobby() {
     const seated = i < 4;
     return '<div class="lbrow' + (p.id === NET.id ? ' me' : '') + '"><i>' + (seated ? ('桌' + (i + 1)) : '观') + '</i><b>' + p.name + '</b>'
       + (i === 0 ? '<em class="seat">房主</em>' : (seated ? '' : '<em class="watch">观战</em>')) + '</div>';
-  }).join('') + (order.length < 2 ? '<p class="lbtip">至少两个人才能开局，把链接发给朋友</p>' : '');
+  }).join('') + (order.length < 2
+    ? '<p class="lbtip">只看到你自己。确认对面打开的是同一个房间链接（房间号要一致），把下面的链接发过去。</p>'
+    : '');
   const btn = document.getElementById('lobbyStart');
   btn.style.display = meHost ? '' : 'none';
   btn.disabled = order.length < 2;
   document.getElementById('lobbyWait').style.display = meHost ? 'none' : '';
+  if (NET.connected) netStatus('online');
   if (meHost && order.length >= 2 && PARAMS.has('autostart') && !NET.started) { setTimeout(() => netStartGame(), 600); }
   el.classList.add('show');
 }
@@ -3377,7 +3438,9 @@ function showEntry() {
   if (!el) return;
   const inp = document.getElementById('entryName');
   inp.value = MYNAME || ('玩家' + Math.floor(Math.random() * 900 + 100));
-  document.getElementById('entryRoom').textContent = NET.on ? ('房间 · ' + NET.room) : '单机';
+  document.getElementById('entryRoom').textContent = NET.on ? ('房间 · ' + NET.room) : '单机（没开联机）';
+  document.getElementById('entryNet').style.display = NET.on ? 'none' : '';
+  document.getElementById('entryCopy').style.display = NET.on ? '' : 'none';
   el.classList.add('show');
   setTimeout(() => { try { inp.focus(); } catch (e) {} }, 300);
 }
