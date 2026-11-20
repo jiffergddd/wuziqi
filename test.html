@@ -44,7 +44,25 @@
     background:radial-gradient(ellipse at 50% 56%,rgba(0,0,0,0) 30%,rgba(46,0,0,.62) 100%)}
   #pulse.on{opacity:1;animation:pulseBeat 1.15s ease-in-out infinite}
   @keyframes pulseBeat{0%,100%{opacity:.3}16%{opacity:.85}34%{opacity:.35}52%{opacity:.7}}
-  .helpBtn{position:fixed;right:20px;top:16px;width:30px;height:30px;border-radius:50%;z-index:5;cursor:pointer;
+  .lobby{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:10;
+    background:rgba(6,6,8,.72);opacity:0;pointer-events:none;transition:opacity .3s}
+  .lobby.show{opacity:1;pointer-events:auto}
+  .lobbyCard{width:360px;max-width:88vw;padding:24px 26px;border-radius:18px;background:rgba(18,18,20,.95);
+    border:1px solid rgba(239,230,214,.16);box-shadow:0 30px 80px rgba(0,0,0,.65)}
+  .lobbyCard h3{margin:0 0 16px;font-size:16px;letter-spacing:.06em;display:flex;justify-content:space-between;align-items:center}
+  .lobbyCard h3 span{color:var(--amber-hot);font-size:13px;letter-spacing:.1em}
+  .lobbyList{display:flex;flex-direction:column;gap:8px;min-height:60px}
+  .lbrow{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:11px;
+    background:rgba(255,255,255,.04);border:1px solid rgba(239,230,214,.1);font-size:14px}
+  .lbrow i{font-style:normal;color:var(--bone-dim);font-size:12px;width:14px}
+  .lbrow.me{border-color:rgba(255,179,92,.55);background:rgba(255,179,92,.1)}
+  .lbrow em{margin-left:auto;font-style:normal;font-size:11px;color:var(--amber-hot)}
+  .lbtip{font-size:12px;color:var(--bone-dim);line-height:1.7;margin:14px 0 0}
+  .lobbyBtns{display:flex;gap:10px;margin-top:16px}
+  .lobbyBtns button{flex:1;padding:11px 0;border-radius:11px;font-size:14px;font-weight:700;cursor:pointer;
+    border:1px solid rgba(255,179,92,.55);background:rgba(255,179,92,.18);color:var(--bone)}
+  .lobbyBtns button.ghost{border-color:rgba(239,230,214,.24);background:rgba(255,255,255,.05)}
+  .lobbyBtns button:disabled{opacity:.35;cursor:default}  .helpBtn{position:fixed;right:20px;top:16px;width:30px;height:30px;border-radius:50%;z-index:5;cursor:pointer;
     background:rgba(12,14,17,.6);color:var(--bone);border:1px solid rgba(239,230,214,.25);font-weight:700;
     backdrop-filter:blur(6px)}
   .help{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:9;
@@ -71,12 +89,13 @@
   .rival .em{font-size:18px;line-height:1}
   .rival .rv b{font-size:13px;display:block;line-height:1.3}
   .rival .rv i{font-style:normal;font-size:11px;color:var(--bone-dim)}
+  .rival .rv b em{font-style:normal;color:var(--amber-hot);font-size:11px}
   .dots{display:flex;gap:3.5px;margin-top:5px}
   .dot{width:7px;height:7px;border-radius:50%;background:rgba(239,230,214,.22);box-shadow:inset 0 0 0 1px rgba(0,0,0,.4)}
   .dot.spent{background:#6f2a20}
   .dot.near{background:#d2622a;box-shadow:0 0 7px #d2622a}
-  .claim{position:fixed;left:50%;top:13%;transform:translateX(-50%);font-size:14px;line-height:1.6;
-    color:var(--amber-hot);opacity:0;transition:opacity .3s;text-align:center;max-width:82vw;
+  .claim{position:fixed;left:22px;top:88px;font-size:14px;line-height:1.7;
+    color:var(--amber-hot);opacity:0;transition:opacity .3s;text-align:left;max-width:340px;
     text-shadow:0 2px 14px rgba(0,0,0,.9);z-index:3}
   .acts{position:fixed;right:22px;bottom:92px;display:flex;flex-direction:column;gap:10px;z-index:4;
     opacity:0;pointer-events:none;transition:opacity .2s}
@@ -105,35 +124,36 @@
   .overCard button{padding:12px 28px;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;
     border:1px solid rgba(255,179,92,.55);background:rgba(255,179,92,.18);color:var(--bone)}
   @media (max-width:560px){
-    .rivals{right:8px;left:8px;top:58px;transform:none;display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-    .rival{flex-direction:column;align-items:center;gap:3px;min-width:0;padding:5px 4px;border-radius:10px}
+    /* ---- 竖屏手机（按 iPhone 17 Pro Max 440x956 调） ---- */
+    #hud{padding:0}
+    .title{display:none}
     .roster{display:none}
-    .rivals{overflow:hidden}
-    .rival{min-width:0;overflow:hidden}
-    .rival .rv{min-width:0;overflow:hidden}
-    .dot{width:4.5px;height:4.5px}
-    .dots{gap:2px;margin-top:3px}
+    .hint{display:none}
+    .helpBtn{top:8px;right:8px;width:26px;height:26px;font-size:13px}
+
+    .topbar{top:8px;left:50%;gap:6px}
+    .tag{font-size:11px;padding:4px 9px;letter-spacing:.02em}
+    .tag b{font-size:12px}
+
+    .rivals{top:44px;left:8px;right:8px;transform:none;display:grid;grid-template-columns:repeat(3,1fr);
+      gap:5px;overflow:hidden}
+    .rival{flex-direction:column;align-items:center;gap:3px;min-width:0;padding:5px 4px;
+      border-radius:10px;overflow:hidden}
+    .rival .em{font-size:15px}
+    .rival .rv{min-width:0;width:100%;text-align:center}
+    .rival .rv b{font-size:10px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .rival .rv i{display:none}
-    .rival .rv b{font-size:10px;max-width:54px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .rival .dots{margin-top:2px}
-    .claim{top:112px}
-    .rival{min-width:0;padding:6px 9px;border-radius:11px}
-    .rival .rv b{font-size:11px}
-    .rival .rv i{font-size:9px}
-    .rival .em{font-size:14px}
-    .dot{width:5px;height:5px}
-    .banner{font-size:24px}
-    .acts{right:12px;bottom:120px}
-    .acts button{padding:11px 16px;font-size:14px}
-    .claim{font-size:12px;top:11%}
-    .topbar{top:10px}
-    .tag{font-size:11px;padding:5px 9px}
-    #hud{padding:12px 14px}
-    .title b{font-size:17px}
-    .chip{font-size:12px;padding:6px 10px 6px 8px}
-    .hint{font-size:11px;bottom:10px}
-  }
-</style>
+    .rival .rv b em{display:none}
+    .dots{gap:2px;margin-top:2px;justify-content:center}
+    .dot{width:4px;height:4px}
+
+    .claim{left:50%;transform:translateX(-50%);top:112px;font-size:12px;max-width:92vw;line-height:1.5;text-align:center}
+
+    .acts{left:10px;right:10px;bottom:12px;flex-direction:row;gap:8px}
+    .acts button{flex:1;padding:14px 0;font-size:15px;border-radius:12px}
+    .banner{font-size:26px;top:32%}
+    .lobbyCard{width:auto;margin:0 14px}
+  }</style>
 </head>
 <body>
 <div id="scene"></div>
@@ -161,12 +181,23 @@
 <div class="help" id="help">
   <div class="helpCard">
     <h3>骗子农场 · 怎么玩</h3>
-    <p>桌上有一把牌：<b>小麦 6、玉米 6、南瓜 6、稻草人 2、皇冠 2</b>。稻草人和皇冠都是万能牌，摊牌时算真话。</p>
+    <p>桌上有一把牌：<b>小麦 6、玉米 6、南瓜 6、皇冠 2</b>。皇冠是万能牌，摊牌时算真话。</p>
     <p>每局会指定一种作物。轮到你时，从手里挑 <b>1–3 张</b>扣在桌上，声称它们都是那种作物——<b>你可以说谎</b>。</p>
     <p>下一个人可以选择<b>接着出</b>，或者<b>质疑</b>你。质疑就摊牌：牌里只要有一张不是那种作物，你掏枪；全是真牌，质疑的人掏枪。</p>
     <p>枪里 6 个膛、1 发子弹。轮到你的次数到了那颗子弹，就响——<b>倒下出局</b>。活到最后的人赢。</p>
     <p>手里牌快没了就少出几张，别把牌打光；也别以为 AI 不会数牌。</p>
     <button id="btnHelpClose">知道了</button>
+  </div>
+</div>
+<div class="lobby" id="lobby">
+  <div class="lobbyCard">
+    <h3>联机房间 <span id="lobbyRoom">—</span></h3>
+    <div id="lobbyList" class="lobbyList"></div>
+    <div class="lobbyBtns">
+      <button id="lobbyStart">开始</button>
+      <button id="lobbyCopy" class="ghost">复制邀请链接</button>
+    </div>
+    <p class="lbtip" id="lobbyWait">等房主开局…</p>
   </div>
 </div>
 <div id="flash"></div>
@@ -1477,12 +1508,242 @@ function spawnSeats(seed) {
     a.self = seat.key === 'S';
     a.group.visible = !a.self;
     scene.add(a.group);
+    attachHeadUI(a);
     animals.push(a);
   });
 
   renderRoster();
 }
 
+/* ================= 头顶名牌 + 血条 ================= */
+const LS_STATS = 'farm_stats_v1';
+let stats = {};
+try { stats = JSON.parse(localStorage.getItem(LS_STATS) || '{}') || {}; } catch (e) { stats = {}; }
+function saveStats() { try { localStorage.setItem(LS_STATS, JSON.stringify(stats)); } catch (e) {} }
+/* 只记 胜场 和 总场次；胜率 = 胜场 / 总场次（旧数据里的 l 自动折进 n） */
+function normStats() {
+  for (const k in stats) {
+    const s = stats[k] || {};
+    if (typeof s.n !== 'number') s.n = (s.w || 0) + (s.l || 0);
+    s.w = s.w || 0;
+    delete s.l;
+    stats[k] = s;
+  }
+}
+normStats();
+function winsOf(name) { const s = stats[name]; return s ? (s.w || 0) : 0; }
+function gamesOf(name) { const s = stats[name]; return s ? (s.n || 0) : 0; }
+function rateOf(name) {
+  const s = stats[name];
+  if (!s || !s.n) return null;
+  return Math.round((s.w / s.n) * 100);
+}
+function recordResult(name, won) {
+  const s = stats[name] || (stats[name] = { w: 0, n: 0 });
+  s.n = (s.n || 0) + 1;
+  if (won) s.w = (s.w || 0) + 1;
+  saveStats();
+}
+
+function makeHeadLabel(name) {
+  const W = 512, H = 140;
+  const tex = canvasTexWH(W, H, (g) => {
+    g.clearRect(0, 0, W, H);
+    const rate = rateOf(name);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = '700 58px "PingFang SC","Microsoft YaHei",sans-serif';
+    g.lineWidth = 11;
+    g.strokeStyle = 'rgba(6,6,8,.92)';
+    g.strokeText(name, W / 2, rate === null ? H / 2 : H / 2 - 14);
+    g.fillStyle = '#f4ecdc';
+    g.fillText(name, W / 2, rate === null ? H / 2 : H / 2 - 14);
+    if (rate !== null) {
+      const t = winsOf(name) + '胜 · ' + rate + '%';
+      g.font = '700 36px "PingFang SC",sans-serif';
+      g.lineWidth = 8;
+      g.strokeStyle = 'rgba(6,6,8,.92)';
+      g.strokeText(t, W / 2, H / 2 + 40);
+      g.fillStyle = '#ffbd63';
+      g.fillText(t, W / 2, H / 2 + 40);
+    }
+  });
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: true }));
+  sp.scale.set(0.62, 0.17, 1);
+  return sp;
+}
+
+function makeHpBar() {
+  const g = new THREE.Group();
+  const bgGeo = new THREE.PlaneGeometry(0.34, 0.036);
+  const bg = new THREE.Mesh(bgGeo, new THREE.MeshBasicMaterial({ color: 0x0d0a07, transparent: true, opacity: 0.72, depthWrite: false }));
+  g.add(bg);
+  const frame = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.05), new THREE.MeshBasicMaterial({ color: 0xe8dcc4, transparent: true, opacity: 0.28, depthWrite: false }));
+  frame.position.z = -0.001;
+  g.add(frame);
+  const fillGeo = new THREE.PlaneGeometry(1, 0.026).translate(0.5, 0, 0);
+  const fill = new THREE.Mesh(fillGeo, new THREE.MeshBasicMaterial({ color: 0x74c04a, transparent: true, opacity: 0.95, depthWrite: false }));
+  fill.position.set(-0.16, 0, 0.002);
+  g.add(fill);
+  g.userData.fill = fill;
+  return g;
+}
+
+const headUIs = [];
+
+function attachHeadUI(a) {
+  const g = new THREE.Group();
+  const label = makeHeadLabel(a.name);
+  label.position.y = 0.13;
+  g.add(label);
+  const bar = makeHpBar();
+  g.add(bar);
+  scene.add(g);
+  a.headUI = { host: a, group: g, bar, label, hp: 100, maxHp: 100 };
+  headUIs.push(a.headUI);
+  refreshHp(a);
+}
+
+function refreshHp(a) {
+  if (!a.headUI) return;
+  const ui = a.headUI;
+  const k = Math.max(0, Math.min(1, ui.hp / ui.maxHp));
+  const f = ui.bar.userData.fill;
+  f.scale.x = Math.max(0.0001, 0.32 * k);
+  f.material.color.setHex(k > 0.55 ? 0x74c04a : (k > 0.25 ? 0xd8a13a : 0xc0452f));
+  ui.label.material.opacity = a.group.visible ? 1 : 0;
+  ui.bar.visible = a.group.visible;
+  ui.label.visible = a.group.visible;
+}
+
+/* ================= 场后墙上的胜场榜 ================= */
+const LB = { tex: null, ctx: null, canvas: null };
+
+function drawBoard(g, W, H) {
+  g.fillStyle = '#1b1611';
+  g.fillRect(0, 0, W, H);
+  const grd = g.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0, 'rgba(255,190,120,.07)');
+  grd.addColorStop(1, 'rgba(0,0,0,.25)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(255,200,130,.3)';
+  g.lineWidth = 8;
+  g.strokeRect(16, 16, W - 32, H - 32);
+
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillStyle = '#ffcf8a';
+  g.font = '800 46px "PingFang SC","Microsoft YaHei",sans-serif';
+  g.fillText('胜 场 排 行', W / 2, 62);
+
+  g.font = '600 20px "PingFang SC",sans-serif';
+  g.fillStyle = 'rgba(232,222,204,.5)';
+  g.textAlign = 'left';
+  g.fillText('名次', 74, 112);
+  g.fillText('名字', 176, 112);
+  g.textAlign = 'right';
+  g.fillText('胜场', W - 232, 112);
+  g.fillText('胜率', W - 84, 112);
+
+  const me = localStorage.getItem('farm_me') || '';
+  const list = Object.keys(stats)
+    .map(n => ({ n, w: winsOf(n), g: gamesOf(n) }))
+    .filter(x => x.g > 0)
+    .sort((a, b) => (b.w - a.w) || (b.w / b.g - a.w / a.g) || a.n.localeCompare(b.n))
+    .slice(0, 7);
+
+  if (!list.length) {
+    g.textAlign = 'center';
+    g.font = '600 26px "PingFang SC",sans-serif';
+    g.fillStyle = 'rgba(232,222,204,.55)';
+    g.fillText('还没有战绩，打完一局就上墙', W / 2, H / 2 + 30);
+    return;
+  }
+
+  list.forEach((row, i) => {
+    const y = 158 + i * 40;
+    g.textAlign = 'left';
+    g.font = '700 26px "PingFang SC",sans-serif';
+    g.fillStyle = 'rgba(232,222,204,.55)';
+    g.fillText(String(i + 1), 78, y);
+    g.fillStyle = row.n === me ? '#ffd9a0' : 'rgba(242,234,218,.92)';
+    g.fillText(row.n, 176, y);
+    g.textAlign = 'right';
+    g.fillStyle = '#ffbd63';
+    g.fillText(row.w + ' 胜', W - 232, y);
+    g.fillText(Math.round((row.w / row.g) * 100) + '%', W - 84, y);
+    g.strokeStyle = 'rgba(255,220,170,.1)';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(74, y + 20);
+    g.lineTo(W - 74, y + 20);
+    g.stroke();
+  });
+}
+
+function updateBoard() {
+  if (!LB.ctx) return;
+  drawBoard(LB.ctx, LB.canvas.width, LB.canvas.height);
+  LB.tex.needsUpdate = true;
+}
+
+function buildLeaderboard() {
+  const W = 1024, H = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const g = canvas.getContext('2d');
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  LB.canvas = canvas;
+  LB.ctx = g;
+  LB.tex = tex;
+  drawBoard(g, W, H);
+
+  const group = new THREE.Group();
+  const screen = new THREE.Mesh(
+    new THREE.PlaneGeometry(4.4, 2.2),
+    new THREE.MeshBasicMaterial({ map: tex })
+  );
+  group.add(screen);
+
+  const woodMat = new THREE.MeshStandardMaterial({ map: plankTex, color: 0x6b4c31, roughness: 0.92 });
+  const darkWood = new THREE.MeshStandardMaterial({ color: 0x2e2116, roughness: 0.95 });
+  const backing = new THREE.Mesh(new THREE.BoxGeometry(4.72, 2.52, 0.1), woodMat);
+  backing.position.z = -0.07;
+  backing.castShadow = true;
+  group.add(backing);
+  for (const sy of [-1, 1]) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.1, 0.14), darkWood);
+    bar.position.set(0, sy * 1.28, -0.02);
+    group.add(bar);
+  }
+  for (const sx of [-1, 1]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.9, 0.16), darkWood);
+    post.position.set(sx * 2.32, -1.35, -0.12);
+    post.castShadow = true;
+    group.add(post);
+  }
+  /* 板子顶上的小灯：照亮木牌 */
+  const lamp = new THREE.PointLight(0xffc07a, 3.2, 6, 2);
+  lamp.position.set(0, 1.6, 0.8);
+  group.add(lamp);
+
+  group.position.set(0, 2.46, -6.55);
+  scene.add(group);
+}
+
+buildLeaderboard();
+function updateHeadUI() {
+  for (const ui of headUIs) {
+    const a = ui.host;
+    if (!a || !a.group.visible) continue;
+    ui.group.position.set(a.group.position.x, a.group.position.y + a.headY + 0.24, a.group.position.z);
+    ui.group.quaternion.copy(camera.quaternion);
+  }
+}
 function renderRoster() {
   const el = document.getElementById('roster');
   el.innerHTML = animals.map(a => {
@@ -1611,11 +1872,10 @@ const CARD_RANKS = {
   wheat: { cn: '小麦', tint: '#d8b45a' },
   corn: { cn: '玉米', tint: '#e2b53c' },
   pumpkin: { cn: '南瓜', tint: '#e0873a' },
-  joker: { cn: '稻草人', tint: '#9c8a5e' },
   crown: { cn: '皇冠', tint: '#d9b23c' }
 };
 const RANK_ORDER = ['wheat', 'corn', 'pumpkin'];
-const DECK_PLAN = [['wheat', 6], ['corn', 6], ['pumpkin', 6], ['joker', 2], ['crown', 2]];
+const DECK_PLAN = [['wheat', 6], ['corn', 6], ['pumpkin', 6], ['crown', 2]];
 
 function canvasTexWH(w, h, draw) {
   const c = document.createElement('canvas');
@@ -1678,19 +1938,6 @@ function iconPumpkin(g, s) {
   g.fillStyle = '#6f5a2a';
   g.beginPath(); g.roundRect(-s * 0.045, -s * 0.36, s * 0.09, s * 0.13, s * 0.03); g.fill();
 }
-function iconScarecrow(g, s) {
-  g.strokeStyle = '#8a6a3a'; g.lineWidth = s * 0.06;
-  g.beginPath(); g.moveTo(0, -s * 0.42); g.lineTo(0, s * 0.44); g.stroke();
-  g.beginPath(); g.moveTo(-s * 0.36, -s * 0.12); g.lineTo(s * 0.36, -s * 0.12); g.stroke();
-  g.fillStyle = '#c9ab6d';
-  g.beginPath(); g.arc(0, -s * 0.26, s * 0.15, 0, 6.283); g.fill();
-  g.fillStyle = '#3a2a18';
-  g.beginPath(); g.arc(-s * 0.055, -s * 0.29, s * 0.024, 0, 6.283); g.fill();
-  g.beginPath(); g.arc(s * 0.055, -s * 0.29, s * 0.024, 0, 6.283); g.fill();
-  g.fillStyle = '#6b4a2a';
-  g.beginPath(); g.ellipse(0, -s * 0.37, s * 0.21, s * 0.05, 0, 0, 6.283); g.fill();
-  g.fillRect(-s * 0.11, -s * 0.46, s * 0.22, s * 0.09);
-}
 function iconCrown(g, s) {
   g.fillStyle = '#e8c04a';
   g.beginPath();
@@ -1712,8 +1959,7 @@ function iconCrown(g, s) {
   g.beginPath(); g.arc(s * 0.21, s * 0.195, s * 0.036, 0, 6.283); g.fill();
   g.fillStyle = 'rgba(255,255,255,.35)';
   g.beginPath(); g.arc(-s * 0.3, -s * 0.18, s * 0.04, 0, 6.283); g.fill();
-}
-const RANK_ICONS = { wheat: iconWheat, corn: iconCorn, pumpkin: iconPumpkin, joker: iconScarecrow, crown: iconCrown };
+}const RANK_ICONS = { wheat: iconWheat, corn: iconCorn, pumpkin: iconPumpkin, crown: iconCrown };
 
 function drawCardFace(g, W, H, rank) {
   g.fillStyle = '#f4ebd8';
@@ -1766,7 +2012,7 @@ const cardEdgeMat = new THREE.MeshStandardMaterial({ color: 0xe9e0ca, roughness:
 const cardGeo = new THREE.BoxGeometry(0.09, 0.005, 0.13);
 
 function cardMesh(rank, faceUp) {
-  const face = cardFaceMats[rank] || cardFaceMats.joker;
+  const face = cardFaceMats[rank] || cardFaceMats.crown;
   const mats = faceUp
     ? [cardEdgeMat, cardEdgeMat, face, cardBackMat, cardEdgeMat, cardEdgeMat]
     : [cardEdgeMat, cardEdgeMat, cardBackMat, face, cardEdgeMat, cardEdgeMat];
@@ -2090,7 +2336,7 @@ function updateHUD() {
     }).join('');
     return '<div class="rival' + (p.alive ? '' : ' dead') + (G.players[G.turn] === p ? ' active' : '') + '">'
       + '<span class="em">' + SPECIES[p.kind].emoji + '</span>'
-      + '<div class="rv"><b>' + p.name + '</b><i>' + p.hand.length + ' 张 · ' + (p.alive ? '存活' : '出局') + '</i>'
+      + '<div class="rv"><b>' + p.name + (rateOf(p.name) !== null ? ' <em>' + rateOf(p.name) + '%</em>' : '') + '</b><i>' + p.hand.length + ' 张 · ' + (p.alive ? '存活' : '出局') + '</i>'
       + '<div class="dots">' + dots + '</div></div></div>';
   }).join('');
 }
@@ -2290,7 +2536,7 @@ function flashScreen() {
 let shake = 0;
 async function shakeCamera(dur) {
   shake = dur;
-  await sleep(dur * 1000);
+  await T(dur * 1000);
   shake = 0;
 }
 
@@ -2300,6 +2546,7 @@ async function eliminate(p) {
   p.hand = [];
   updateHUD();
   if (p.cardsGroup) p.cardsGroup.visible = false;
+  if (p.animal.headUI) { p.animal.headUI.group.visible = false; }
   Audio2.lose();
   await Promise.all([
     tween(p.animal.group.rotation, { x: -1.3 }, 0.7, easeInOut),
@@ -2329,7 +2576,7 @@ function aiDecide(p) {
   }
 
   const targetCards = p.hand.filter(c => c.rank === G.target);
-  const wilds = p.hand.filter(c => c.rank === 'joker' || c.rank === 'crown');
+  const wilds = p.hand.filter(c => c.rank === 'crown');
   const lie = Math.random() < p.ai.bluff;
   let cards;
   if (!lie && targetCards.length) {
@@ -2370,17 +2617,32 @@ function resolveHuman(action) {
 }
 
 HUD.play.addEventListener('click', () => {
-  const p = G.players[0];
   const cards = handMeshes.filter(it => selected.has(it.card.id)).map(it => it.card);
   if (!cards.length || cards.length > 3) return;
+  if (NET.on && !netIsHost()) {
+    netSend({ type: 'play', ids: cards.map(c => c.id) });
+    selected.clear();
+    layoutHand();
+    HUD.acts.classList.remove('show');
+    setClaim('已出牌，等别人…');
+    return;
+  }
   const meshes = handMeshes.filter(it => selected.has(it.card.id)).map(it => it.mesh);
   resolveHuman({ type: 'play', cards, meshes });
 });
 
 HUD.challenge.addEventListener('click', () => {
+  if (NET.on && !netIsHost()) {
+    netSend({ type: 'challenge' });
+    HUD.acts.classList.remove('show');
+    setClaim('已质疑，等摊牌…');
+    return;
+  }
   resolveHuman({ type: 'challenge' });
 });
 
+document.getElementById('lobbyStart').addEventListener('click', () => netStartGame());
+document.getElementById('lobbyCopy').addEventListener('click', () => netCopyLink());
 document.getElementById('btnHelp').addEventListener('click', () => {
   document.getElementById('help').classList.add('show');
 });
@@ -2427,7 +2689,13 @@ async function playRound() {
     if (!p.alive) { G.turn = nextAlive(G.turn); continue; }
 
     let action;
-    if (p.human) {
+    if (p.human && p.remote) {
+      G.phase = 'human';
+      setClaim('等「' + p.name + '」出牌…');
+      updateHUD();
+      action = await netWaitAction(p);
+      if (!action) action = aiDecide(p);
+    } else if (p.human) {
       if (G.auto) {
         await T(500);
         action = aiDecide(p);
@@ -2464,7 +2732,7 @@ async function playRound() {
     const prevLies = G.lastClaim ? G.lastClaim.lies : 0;
 
     /* 谎话检测（真的有没有说谎） */
-    const isLie = cards.some(c => c.rank !== G.target && c.rank !== 'joker' && c.rank !== 'crown');
+    const isLie = cards.some(c => c.rank !== G.target && c.rank !== 'crown');
     G.lastClaim = {
       by: p.idx,
       count: cards.length,
@@ -2478,6 +2746,7 @@ async function playRound() {
     setClaim('「' + p.name + '」打出 ' + cards.length + ' 张 · 声称是' + CARD_RANKS[G.target].cn);
     await flyCardsToPile(p, cards, meshes);
     if (Math.random() < 0.6) Audio2.creak();
+    netPublishState('turn');
     if (p.human) buildHand(p);
     updateHUD();
 
@@ -2513,7 +2782,17 @@ async function resolveChallenge(challenger) {
   await T(1200);
 
   const shot = await roulette(loser);
-  if (shot) await eliminate(loser);
+  if (shot) {
+    const ui = loser.animal.headUI;
+    ui.hp = Math.max(0, ui.hp - 50);
+    refreshHp(loser.animal);
+    if (ui.hp <= 0) {
+      await eliminate(loser);
+    } else {
+      showBanner('还剩一口气', 1100, 'bang');
+      await T(700);
+    }
+  }
   await T(350);
   await holsterGun(loser);
   camPushTarget = 0;
@@ -2545,12 +2824,19 @@ function gameOver() {
   G.over = true;
   G.phase = 'over';
   const winner = alivePlayers()[0];
+  if (!SIM) {
+    G.players.forEach(p => recordResult(p.name, p === winner));
+    const me = G.players.find(p => p.human);
+    if (me) { try { localStorage.setItem('farm_me', me.name); } catch (e) {} }
+    updateBoard();
+  }
   const youWin = winner && winner.human;
   HUD.overTitle.textContent = youWin ? '你活着走出了院子' : '你倒在了桌子底下';
   HUD.overText.textContent = youWin
     ? '最后一把枪没有响。'
     : (winner ? '「' + winner.name + '」' + SPECIES[winner.kind].cn + ' 活到了最后。' : '全都没了。');
   HUD.over.classList.add('show');
+  netPublishState('over');
   HUD.acts.classList.remove('show');
   setClaim('');
   if (youWin) Audio2.win(); else Audio2.lose();
@@ -2600,6 +2886,7 @@ async function newGame() {
     p.animal.group.position.y = 0.44;
     p.animal.group.visible = !p.human;
     if (p.cardsGroup) { p.cardsGroup.visible = true; }
+    if (p.animal.headUI) { p.animal.headUI.hp = 100; p.animal.headUI.group.visible = true; refreshHp(p.animal); }
   });
   placeGuns();
   updateHUD();
@@ -2651,7 +2938,10 @@ function resize() {
   renderer.setSize(w, h);
   camera.aspect = w / h;
   /* 竖屏手机横向视野太窄，坐得近一点、低头一点，画面才不空 */
-  if (camera.aspect < 0.85) {
+  if (NET.on) {
+    applyCamSeat(NET.mySeat);
+    camera.fov = camera.aspect < 0.85 ? 64 : (camera.aspect < 1.3 ? 60 : 55);
+  } else if (camera.aspect < 0.85) {
     CAM_POS.set(0, 1.28, 1.74);
     CAM_LOOK.set(0, 0.74, -0.32);
     camera.fov = 64;
@@ -2666,17 +2956,375 @@ function resize() {
   }
   camera.updateProjectionMatrix();
   /* 手牌跟着屏幕比例缩放，竖屏才不会把手牌切掉 */
-  const hs = camera.aspect < 0.85 ? 0.62 : (camera.aspect < 1.3 ? 0.85 : 1);
+  const portrait = camera.aspect < 0.85;
+  const hs = portrait ? 0.68 : (camera.aspect < 1.3 ? 0.85 : 1);
   handGroup.scale.setScalar(hs);
-  handGroup.position.y = -0.185;
+  handGroup.position.y = portrait ? -0.29 : -0.185;
 }
 window.addEventListener('resize', resize);
+
+/* ================= 联机（MQTT 房间） ================= */
+const NET = {
+  on: false, id: '', name: '', room: '', client: null, connected: false,
+  peers: new Map(), pending: null, seq: 0, mySeat: 0, hostId: '', started: false, lastState: null
+};
+const NET_BROKER = 'wss://broker.emqx.io:8084/mqtt';
+const T_WHO = id => 'farm/' + NET.room + '/who/' + id;
+const T_STATE = () => 'farm/' + NET.room + '/state';
+const T_ACT = () => 'farm/' + NET.room + '/act';
+const T_PRIV = pid => 'farm/' + NET.room + '/priv/' + pid;
+
+function loadMqttScript(cb) {
+  if (window.mqtt) return cb();
+  const srcs = [
+    './vendor/mqtt.min.js',
+    'https://fastly.jsdelivr.net/npm/mqtt@4.3.7/dist/mqtt.min.js',
+    'https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js'
+  ];
+  (function next(i) {
+    if (i >= srcs.length) { showBanner('联机组件没加载出来', 3000, 'bang'); return; }
+    const s = document.createElement('script');
+    s.src = srcs[i];
+    s.onload = () => window.mqtt ? cb() : next(i + 1);
+    s.onerror = () => next(i + 1);
+    document.head.appendChild(s);
+  })(0);
+}
+
+function netBoot() {
+  const room = (PARAMS.get('room') || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  if (!room) return false;
+  NET.on = true;
+  NET.room = room;
+  NET.id = 'p' + Math.random().toString(36).slice(2, 8);
+  NET.name = (PARAMS.get('name') || localStorage.getItem('farm_name') || ('玩家' + NET.id.slice(-3))).slice(0, 8);
+  loadMqttScript(netConnect);
+  setTimeout(netLobby, 400);
+  return true;
+}
+
+function netConnect() {
+  let c;
+  try {
+    c = mqtt.connect(NET_BROKER, {
+      clientId: 'farm_' + NET.room + '_' + NET.id,
+      keepalive: 25, clean: true, reconnectPeriod: 2500, connectTimeout: 9000,
+      will: { topic: T_WHO(NET.id), payload: '', qos: 1, retain: true }
+    });
+  } catch (e) { return; }
+  NET.client = c;
+  c.on('connect', () => {
+    NET.connected = true;
+    c.subscribe([T_STATE(), T_ACT(), T_WHO('+'), T_PRIV(NET.id)], { qos: 1 });
+    netPublishWho();
+    clearInterval(NET.timer);
+    NET.timer = setInterval(netPublishWho, 8000);
+    netLobby();
+  });
+  c.on('message', (topic, payload) => {
+    let msg = null;
+    try { msg = JSON.parse(new TextDecoder().decode(payload)); } catch (e) { msg = null; }
+    if (topic === T_STATE()) return netOnState(msg);
+    if (topic === T_ACT()) return netOnAct(msg);
+    if (topic === T_PRIV(NET.id)) return netOnHand(msg);
+    const who = 'farm/' + NET.room + '/who/';
+    if (topic.indexOf(who) === 0) return netOnWho(topic.slice(who.length), payload.length ? msg : null);
+  });
+  c.on('error', () => { NET.connected = false; });
+}
+
+function netPublishWho() {
+  if (!NET.connected) return;
+  NET.client.publish(T_WHO(NET.id), JSON.stringify({
+    t: 'who', id: NET.id, name: NET.name, ts: NET.joined || (NET.joined = Date.now()), rate: rateOf(NET.name)
+  }), { qos: 1, retain: true });
+}
+
+function netOnWho(id, msg) {
+  if (msg) NET.peers.set(id, msg);
+  else NET.peers.delete(id);
+  netLobby();
+}
+
+function netOrder() {
+  const all = [{ id: NET.id, name: NET.name, ts: NET.joined || Date.now() }, ...NET.peers.values()];
+  all.sort((a, b) => (a.ts - b.ts) || String(a.id).localeCompare(String(b.id)));
+  return all;
+}
+
+function netIsHost() { return netOrder()[0] && netOrder()[0].id === NET.id; }
+
+/* ---------- 大厅 ---------- */
+function netLobby() {
+  const el = document.getElementById('lobby');
+  if (!el) return;
+  if (NET.started) { el.classList.remove('show'); return; }
+  const order = netOrder();
+  const meHost = netIsHost();
+  document.getElementById('lobbyRoom').textContent = NET.room;
+  document.getElementById('lobbyList').innerHTML = order.slice(0, 4).map((p, i) =>
+    '<div class="lbrow' + (p.id === NET.id ? ' me' : '') + '"><i>' + (i + 1) + '</i><b>' + p.name + '</b>'
+    + (i === 0 ? '<em>房主</em>' : '') + '</div>'
+  ).join('') + (order.length < 2 ? '<p class="lbtip">至少两个人才能开局，把链接发给朋友</p>' : '');
+  const btn = document.getElementById('lobbyStart');
+  btn.style.display = meHost ? '' : 'none';
+  btn.disabled = order.length < 2;
+  document.getElementById('lobbyWait').style.display = meHost ? 'none' : '';
+  if (meHost && order.length >= 2 && PARAMS.has('autostart') && !NET.started) { setTimeout(() => netStartGame(), 600); }
+  el.classList.add('show');
+}
+
+function netCopyLink() {
+  const url = location.origin + location.pathname + '?room=' + NET.room;
+  try { navigator.clipboard.writeText(url); showBanner('链接已复制', 1200); } catch (e) { prompt('复制这个链接', url); }
+}
+
+/* ---------- 主机：开一桌 ---------- */
+async function netStartGame() {
+  const order = netOrder().slice(0, 4);
+  if (order.length < 2) return;
+  NET.started = true;
+  document.getElementById('lobby').classList.remove('show');
+  const seatNames = ['S', 'W', 'N', 'E'];
+  G.players = order.map((peer, i) => {
+    const seat = SEATS[i];
+    const animal = animals[i];
+    return {
+      idx: i, pid: peer.id, remote: peer.id !== NET.id,
+      human: true, local: peer.id === NET.id,
+      alive: true, hand: [], gun: { pos: 1 + Math.floor(Math.random() * 6), count: 0 },
+      name: peer.name, kind: animal.kind, seat, animal,
+      ai: { bluff: 0.55, suspicion: 0.12 }
+    };
+  });
+  NET.mySeat = 0;
+  animals.forEach((a, i) => {
+    a.bound = G.players[i] || null;
+    a.group.visible = i !== NET.mySeat;
+    if (a.headUI) a.headUI.group.visible = i !== NET.mySeat;
+    if (G.players[i]) setAnimalName(a, G.players[i].name);
+  });
+  applyCamSeat(NET.mySeat);
+  netPublishState();
+  await gameLoop();
+}
+
+/* ---------- 状态广播 ---------- */
+function netPublishState(phase) {
+  if (!NET.on || !NetHostFlag()) return;
+  const st = {
+    t: 'state', seq: ++NET.seq, phase: phase || G.phase, round: G.round, target: G.target,
+    turn: G.players[G.turn] ? G.players[G.turn].pid : null,
+    over: G.over, winner: (G.over && alivePlayers()[0]) ? alivePlayers()[0].pid : null,
+    claim: G.lastClaim ? { by: G.players[G.lastClaim.by].pid, count: G.lastClaim.count } : null,
+    pile: G.pile.length,
+    players: G.players.map(p => ({
+      pid: p.pid, name: p.name, seat: p.idx, alive: p.alive,
+      hp: p.animal.headUI ? p.animal.headUI.hp : 100,
+      count: p.hand.length
+    }))
+  };
+  NET.client.publish(T_STATE(), JSON.stringify(st), { qos: 1, retain: true });
+  G.players.forEach(p => { if (p.remote) netPublishHand(p); });
+}
+
+function NetHostFlag() { return netIsHost(); }
+
+function netPublishHand(p) {
+  if (!NET.connected || !p.remote) return;
+  NET.client.publish(T_PRIV(p.pid), JSON.stringify({
+    t: 'hand', cards: p.hand.map(c => ({ id: c.id, rank: c.rank }))
+  }), { qos: 1, retain: true });
+}
+
+/* ---------- 客户端：收状态 ---------- */
+function netOnState(st) {
+  if (!st || st.t !== 'state') return;
+  if (NetHostFlag()) return; /* 主机不信任回环 */
+  if (st.seq <= (NET.lastSeq || 0)) return;
+  NET.lastSeq = st.seq;
+  NET.started = true;
+  document.getElementById('lobby').classList.remove('show');
+  applyNetState(st);
+}
+
+function applyNetState(st) {
+  G.round = st.round;
+  G.target = st.target;
+  G.over = st.over;
+  G.phase = st.phase;
+  const mine = st.players.find(p => p.pid === NET.id);
+  NET.mySeat = mine ? mine.seat : 0;
+  applyCamSeat(NET.mySeat);
+  if (!G.players.length) {
+    G.players = st.players.map(p => ({
+      idx: p.seat, pid: p.pid, human: true, remote: false, local: p.pid === NET.id,
+      alive: p.alive, hand: [], gun: { pos: 1, count: 0 },
+      name: p.name, kind: animals[p.seat].kind, seat: SEATS[p.seat], animal: animals[p.seat]
+    }));
+  }
+  st.players.forEach(p => {
+    const gp = G.players.find(x => x.pid === p.pid);
+    if (!gp) return;
+    gp.alive = p.alive;
+    gp.name = p.name;
+    if (p.pid !== NET.id) gp.hand = new Array(p.count || 0);
+    gp.animal.headUI.hp = p.hp;
+    gp.animal.group.visible = p.pid !== NET.id && p.alive;
+    gp.animal.headUI.group.visible = p.pid !== NET.id && p.alive;
+    refreshHp(gp.animal);
+  });
+  G.turn = Math.max(0, st.players.findIndex(p => p.pid === st.turn));
+  G.lastClaim = st.claim ? { by: st.players.findIndex(p => p.pid === st.claim.by), count: st.claim.count } : null;
+  syncNetPile(st.pile || 0);
+  updateHUD();
+  const me = G.players.find(p => p.local);
+  if (me) setRivalCardsCounts();
+  if (st.over) {
+    gameOver();
+    return;
+  }
+  const isMyTurn = st.turn === NET.id;
+  G.phase = isMyTurn ? 'human' : 'wait';
+  updatePlayButton();
+  if (isMyTurn) {
+    setClaim('轮到你：选 1–3 张，声称是「' + CARD_RANKS[G.target].cn + '」');
+    showBanner('轮到你了', 900);
+  } else {
+    setClaim(st.claim ? '「' + nameOf(st.claim.by, st) + '」出了 ' + st.claim.count + ' 张' : '');
+  }
+}
+
+function nameOf(pid, st) {
+  const p = st.players.find(x => x.pid === pid);
+  return p ? p.name : '？';
+}
+
+function setRivalCardsCounts() {
+  G.players.forEach(p => {
+    if (!p.local) setRivalCards(p, p.hand.length || 0);
+  });
+}
+
+/* ---------- 客户端：收自己的手牌 ---------- */
+function netOnHand(msg) {
+  if (!msg || msg.t !== 'hand') return;
+  const me = G.players.find(p => p.pid === NET.id);
+  if (!me) return;
+  me.hand = msg.cards.map(c => ({ id: c.id, rank: c.rank }));
+  buildHand(me);
+  updateHUD();
+}
+
+/* ---------- 客户端：出牌 ---------- */
+function netSend(action) {
+  if (!NET.connected) return;
+  NET.client.publish(T_ACT(), JSON.stringify({ t: 'act', pid: NET.id, ...action }), { qos: 1 });
+}
+
+function netOnAct(msg) {
+  if (!msg || msg.t !== 'act' || !NetHostFlag()) return;
+  if (!NET.pending || NET.pending.pid !== msg.pid) return;
+  const p = G.players.find(x => x.pid === msg.pid);
+  if (!p) return;
+  if (msg.type === 'play') {
+    const cards = (msg.ids || []).map(id => p.hand.find(c => c.id === id)).filter(Boolean);
+    if (!cards.length || cards.length > 3) return;
+    finishPending({ type: 'play', cards });
+  } else if (msg.type === 'challenge') {
+    finishPending({ type: 'challenge' });
+  }
+}
+
+function finishPending(action) {
+  if (!NET.pending) return;
+  const { res, timer } = NET.pending;
+  NET.pending = null;
+  clearTimeout(timer);
+  res(action);
+}
+
+function netWaitAction(p) {
+  netPublishState('human');
+  return new Promise(res => {
+    const timer = setTimeout(() => { NET.pending = null; res(null); }, 60000);
+    NET.pending = { pid: p.pid, res, timer };
+  });
+}
+
+/* ---------- 机位对应的相机 ---------- */
+function applyCamSeat(seatIdx) {
+  NET.mySeat = seatIdx;
+  const s = SEATS[seatIdx] || SEATS[0];
+  const dir = new THREE.Vector3(s.pos.x, 0, s.pos.z);
+  if (dir.lengthSq() < 1e-4) dir.set(0, 0, 1);
+  dir.normalize();
+  CAM_POS.set(dir.x * 2.24, 1.40, dir.z * 2.24);
+  CAM_LOOK.set(-dir.x * 0.45, 0.80, -dir.z * 0.45);
+}
+
+/* ---------- 客户端的牌堆 ---------- */
+const netPile = [];
+function syncNetPile(n) {
+  while (netPile.length > n) { const m = netPile.pop(); scene.remove(m); }
+  while (netPile.length < n) {
+    const i = netPile.length;
+    const m = cardMesh('wheat', false);
+    m.position.copy(PILE_POS).add(new THREE.Vector3((i % 3 - 1) * 0.02, i * 0.004, (i % 2) * 0.01));
+    m.rotation.y = Math.random() * 0.4 - 0.2;
+    scene.add(m);
+    netPile.push(m);
+  }
+}
+
+/* ---------- 头顶改名 ---------- */
+function setAnimalName(a, name) {
+  if (a._shownName === name) return;
+  a._shownName = name;
+  if (!a.headUI) return;
+  const sp = a.headUI.group.children.find(o => o.isSprite);
+  if (!sp) return;
+  const old = sp.material.map;
+  const tex = makeHeadLabelTex(name);
+  sp.material.map = tex;
+  sp.material.needsUpdate = true;
+  if (old) old.dispose();
+}
+
+function makeHeadLabelTex(name) {
+  const W = 512, H = 140;
+  return canvasTexWH(W, H, (g) => {
+    g.clearRect(0, 0, W, H);
+    const rate = rateOf(name);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = '700 58px "PingFang SC","Microsoft YaHei",sans-serif';
+    g.lineWidth = 11;
+    g.strokeStyle = 'rgba(6,6,8,.92)';
+    g.strokeText(name, W / 2, rate === null ? H / 2 : H / 2 - 14);
+    g.fillStyle = '#f4ecdc';
+    g.fillText(name, W / 2, rate === null ? H / 2 : H / 2 - 14);
+    if (rate !== null) {
+      const t = winsOf(name) + '胜 · ' + rate + '%';
+      g.font = '700 36px "PingFang SC",sans-serif';
+      g.lineWidth = 8;
+      g.strokeStyle = 'rgba(6,6,8,.92)';
+      g.strokeText(t, W / 2, H / 2 + 40);
+      g.fillStyle = '#ffbd63';
+      g.fillText(t, W / 2, H / 2 + 40);
+    }
+  });
+}
 
 /* ================= 启动 ================= */
 resize();
 spawnSeats(Date.now() % 100000);
-if (SIM) simulate(Math.max(1, parseInt(PARAMS.get('sim'), 10) || 1)).catch(e => { const el = document.getElementById('boot'); el.classList.remove('gone'); el.textContent = 'SIM ERR ' + ((e && e.stack) || e); });
-else newGame();
+if (SIM) simulate(1).catch(e => {
+  const el = document.getElementById('boot');
+  el.classList.remove('gone');
+  el.textContent = 'SIM ERR ' + ((e && e.stack) || e);
+});
+else if (!netBoot()) newGame();
 
 let last = performance.now();
 let booted = false;
@@ -2686,6 +3334,7 @@ function frame(now) {
   last = now;
   updateTweens(dt);
   idleAnimals(dt, now);
+  updateHeadUI();
   updateAtmosphere(dt, now);
   updateCamera(dt, now);
   renderer.render(scene, camera);
