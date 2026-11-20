@@ -1,0 +1,2711 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>骗子农场 · 黄昏院子（第 1 步）</title>
+<link rel="icon" href="data:,">
+<style>
+  :root{
+    --ink:#0d0f12; --bone:#efe6d6; --bone-dim:rgba(239,230,214,.62);
+    --amber:#ffb35c; --amber-hot:#ffd39b; --rust:#c8602c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0b0c0e;color:var(--bone);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased}
+  #scene{position:fixed;inset:0}
+  #scene canvas{display:block}
+  #vignette{position:fixed;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse at 50% 45%,rgba(0,0,0,0) 42%,rgba(0,0,0,.55) 100%),
+               linear-gradient(to bottom,rgba(0,0,0,.35),rgba(0,0,0,0) 22%,rgba(0,0,0,0) 72%,rgba(0,0,0,.5));
+    mix-blend-mode:multiply}
+  #hud{position:fixed;inset:0;pointer-events:none;padding:18px 20px;display:flex;flex-direction:column;justify-content:space-between}
+  .title{font-size:13px;line-height:1.5;letter-spacing:.02em}
+  .title b{display:block;font-size:20px;letter-spacing:.16em;font-weight:800;
+    text-shadow:0 2px 18px rgba(255,150,60,.35)}
+  .title span{color:var(--bone-dim)}
+  .roster{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:34px}
+  .chip{display:flex;align-items:center;gap:8px;padding:7px 12px 7px 9px;border-radius:999px;
+    background:rgba(12,14,17,.55);border:1px solid rgba(239,230,214,.16);
+    backdrop-filter:blur(8px);font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+  .chip .em{font-size:17px;line-height:1}
+  .chip b{font-weight:700}
+  .chip i{font-style:normal;color:var(--bone-dim);font-size:11px;letter-spacing:.06em}
+  .chip.me{border-color:rgba(255,179,92,.65);box-shadow:0 0 0 1px rgba(255,179,92,.25),0 6px 24px rgba(0,0,0,.4)}
+  .hint{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);font-size:12px;
+    color:var(--bone-dim);letter-spacing:.06em;white-space:nowrap}
+  #boot{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 40%,#171310,#08090a);font-size:15px;color:var(--bone-dim);
+    transition:opacity .5s ease;z-index:9;text-align:center;padding:24px;line-height:1.7}
+  #boot.gone{opacity:0;pointer-events:none}
+  /* ---------- 心跳 / 帮助 ---------- */
+  #pulse{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .35s;z-index:2;
+    background:radial-gradient(ellipse at 50% 56%,rgba(0,0,0,0) 30%,rgba(46,0,0,.62) 100%)}
+  #pulse.on{opacity:1;animation:pulseBeat 1.15s ease-in-out infinite}
+  @keyframes pulseBeat{0%,100%{opacity:.3}16%{opacity:.85}34%{opacity:.35}52%{opacity:.7}}
+  .helpBtn{position:fixed;right:20px;top:16px;width:30px;height:30px;border-radius:50%;z-index:5;cursor:pointer;
+    background:rgba(12,14,17,.6);color:var(--bone);border:1px solid rgba(239,230,214,.25);font-weight:700;
+    backdrop-filter:blur(6px)}
+  .help{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:9;
+    background:rgba(6,6,8,.78);opacity:0;pointer-events:none;transition:opacity .3s}
+  .help.show{opacity:1;pointer-events:auto}
+  .helpCard{max-width:540px;margin:0 18px;padding:26px 30px;border-radius:18px;background:rgba(18,18,20,.95);
+    border:1px solid rgba(239,230,214,.16);box-shadow:0 30px 80px rgba(0,0,0,.6)}
+  .helpCard h3{margin:0 0 14px;font-size:18px;letter-spacing:.06em}
+  .helpCard p{margin:0 0 10px;font-size:13px;line-height:1.85;color:var(--bone-dim)}
+  .helpCard b{color:var(--amber-hot)}
+  .helpCard button{margin-top:10px;padding:9px 22px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;
+    border:1px solid rgba(255,179,92,.5);background:rgba(255,179,92,.16);color:var(--bone)}
+  /* ---------- 牌局 HUD ---------- */
+  .topbar{position:fixed;left:50%;top:16px;transform:translateX(-50%);display:flex;gap:10px;z-index:3}
+  .tag{padding:6px 13px;border-radius:999px;background:rgba(12,14,17,.6);border:1px solid rgba(239,230,214,.16);
+    font-size:12px;letter-spacing:.06em;color:var(--bone-dim);backdrop-filter:blur(8px);white-space:nowrap}
+  .tag b{color:var(--amber-hot);font-size:13px}
+  .rivals{position:fixed;right:20px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:9px;z-index:3}
+  .rival{display:flex;gap:9px;align-items:center;padding:8px 12px;border-radius:13px;min-width:158px;
+    background:rgba(12,14,17,.52);border:1px solid rgba(239,230,214,.12);backdrop-filter:blur(8px);
+    transition:border-color .25s, box-shadow .25s, opacity .4s}
+  .rival.active{border-color:rgba(255,179,92,.75);box-shadow:0 0 0 1px rgba(255,179,92,.22),0 6px 22px rgba(0,0,0,.4)}
+  .rival.dead{opacity:.32;filter:grayscale(1)}
+  .rival .em{font-size:18px;line-height:1}
+  .rival .rv b{font-size:13px;display:block;line-height:1.3}
+  .rival .rv i{font-style:normal;font-size:11px;color:var(--bone-dim)}
+  .dots{display:flex;gap:3.5px;margin-top:5px}
+  .dot{width:7px;height:7px;border-radius:50%;background:rgba(239,230,214,.22);box-shadow:inset 0 0 0 1px rgba(0,0,0,.4)}
+  .dot.spent{background:#6f2a20}
+  .dot.near{background:#d2622a;box-shadow:0 0 7px #d2622a}
+  .claim{position:fixed;left:50%;top:13%;transform:translateX(-50%);font-size:14px;line-height:1.6;
+    color:var(--amber-hot);opacity:0;transition:opacity .3s;text-align:center;max-width:82vw;
+    text-shadow:0 2px 14px rgba(0,0,0,.9);z-index:3}
+  .acts{position:fixed;right:22px;bottom:92px;display:flex;flex-direction:column;gap:10px;z-index:4;
+    opacity:0;pointer-events:none;transition:opacity .2s}
+  .acts.show{opacity:1}
+  .acts button{pointer-events:auto;padding:13px 22px;border-radius:12px;font-size:15px;font-weight:700;letter-spacing:.05em;
+    border:1px solid rgba(255,179,92,.55);background:rgba(255,179,92,.18);color:var(--bone);cursor:pointer;
+    backdrop-filter:blur(8px);box-shadow:0 8px 24px rgba(0,0,0,.4);transition:transform .12s, opacity .2s}
+  .acts button:active{transform:scale(.96)}
+  .acts button:disabled{opacity:.3;border-color:rgba(239,230,214,.2);background:rgba(255,255,255,.04);cursor:default}
+  .acts button.ghost{border-color:rgba(214,110,80,.6);background:rgba(180,60,40,.24)}
+  .banner{position:fixed;left:50%;top:36%;transform:translate(-50%,-50%) scale(.92);font-size:34px;font-weight:800;
+    letter-spacing:.1em;opacity:0;transition:opacity .18s, transform .18s;pointer-events:none;z-index:5;
+    text-shadow:0 6px 36px rgba(0,0,0,.95)}
+  .banner.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  .banner.bang{color:#ff6a48}
+  .banner.click{color:#9fb6c4}
+  .banner.shout{color:#ffd39b}
+  #flash{position:fixed;inset:0;background:#fff3d8;opacity:0;pointer-events:none;z-index:6}
+  .over{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:8;
+    background:rgba(6,6,8,.8);opacity:0;pointer-events:none;transition:opacity .5s}
+  .over.show{opacity:1;pointer-events:auto}
+  .overCard{text-align:center;padding:34px 44px;border-radius:20px;background:rgba(18,18,20,.9);
+    border:1px solid rgba(239,230,214,.16);box-shadow:0 30px 80px rgba(0,0,0,.6)}
+  .overCard h2{font-size:26px;margin:0 0 10px;letter-spacing:.06em}
+  .overCard p{color:var(--bone-dim);margin:0 0 24px;font-size:14px}
+  .overCard button{padding:12px 28px;border-radius:11px;font-size:15px;font-weight:700;cursor:pointer;
+    border:1px solid rgba(255,179,92,.55);background:rgba(255,179,92,.18);color:var(--bone)}
+  @media (max-width:560px){
+    .rivals{right:8px;left:8px;top:58px;transform:none;display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+    .rival{flex-direction:column;align-items:center;gap:3px;min-width:0;padding:5px 4px;border-radius:10px}
+    .roster{display:none}
+    .rivals{overflow:hidden}
+    .rival{min-width:0;overflow:hidden}
+    .rival .rv{min-width:0;overflow:hidden}
+    .dot{width:4.5px;height:4.5px}
+    .dots{gap:2px;margin-top:3px}
+    .rival .rv i{display:none}
+    .rival .rv b{font-size:10px;max-width:54px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .rival .dots{margin-top:2px}
+    .claim{top:112px}
+    .rival{min-width:0;padding:6px 9px;border-radius:11px}
+    .rival .rv b{font-size:11px}
+    .rival .rv i{font-size:9px}
+    .rival .em{font-size:14px}
+    .dot{width:5px;height:5px}
+    .banner{font-size:24px}
+    .acts{right:12px;bottom:120px}
+    .acts button{padding:11px 16px;font-size:14px}
+    .claim{font-size:12px;top:11%}
+    .topbar{top:10px}
+    .tag{font-size:11px;padding:5px 9px}
+    #hud{padding:12px 14px}
+    .title b{font-size:17px}
+    .chip{font-size:12px;padding:6px 10px 6px 8px}
+    .hint{font-size:11px;bottom:10px}
+  }
+</style>
+</head>
+<body>
+<div id="scene"></div>
+<div id="vignette"></div>
+<div id="hud">
+  <div class="title">
+    <b>骗子农场</b>
+    <span>第 3 步 · 夜里的牌局</span>
+  </div>
+  <div class="roster" id="roster"></div>
+</div>
+<div class="topbar">
+  <div class="tag">第 <b id="roundNo">0</b> 局</div>
+  <div class="tag">本局作物 <b id="targetName">—</b></div>
+</div>
+<div class="rivals" id="rivals"></div>
+<div class="claim" id="claim"></div>
+<div class="acts" id="acts">
+  <button id="btnPlay" disabled>出牌</button>
+  <button id="btnChallenge" class="ghost" disabled>质疑</button>
+</div>
+<div class="banner" id="banner"></div>
+<div id="pulse"></div>
+<button id="btnHelp" class="helpBtn">?</button>
+<div class="help" id="help">
+  <div class="helpCard">
+    <h3>骗子农场 · 怎么玩</h3>
+    <p>桌上有一把牌：<b>小麦 6、玉米 6、南瓜 6、稻草人 2、皇冠 2</b>。稻草人和皇冠都是万能牌，摊牌时算真话。</p>
+    <p>每局会指定一种作物。轮到你时，从手里挑 <b>1–3 张</b>扣在桌上，声称它们都是那种作物——<b>你可以说谎</b>。</p>
+    <p>下一个人可以选择<b>接着出</b>，或者<b>质疑</b>你。质疑就摊牌：牌里只要有一张不是那种作物，你掏枪；全是真牌，质疑的人掏枪。</p>
+    <p>枪里 6 个膛、1 发子弹。轮到你的次数到了那颗子弹，就响——<b>倒下出局</b>。活到最后的人赢。</p>
+    <p>手里牌快没了就少出几张，别把牌打光；也别以为 AI 不会数牌。</p>
+    <button id="btnHelpClose">知道了</button>
+  </div>
+</div>
+<div id="flash"></div>
+<div class="over" id="over">
+  <div class="overCard">
+    <h2 id="overTitle">结束</h2>
+    <p id="overText"></p>
+    <button id="btnAgain">再来一局</button>
+  </div>
+</div><div class="hint">点牌选 1–3 张 · 出牌 / 质疑 · R 重开 · <a href="./" style="color:inherit">回五子棋</a></div>
+<div id="boot">正在点亮院子…</div>
+
+<script type="module">
+import * as THREE from './vendor/three.module.min.js';
+
+window.addEventListener('error', (e) => {
+  const b = document.getElementById('boot');
+  if (b) { b.classList.remove('gone'); b.textContent = '出错了：' + (e.message || e.error); }
+});
+
+const IS_SMALL = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
+  || Math.min(window.innerWidth, window.innerHeight) < 700;
+
+/* ================= 渲染器 ================= */
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: !IS_SMALL, powerPreference: 'high-performance' });
+} catch (e) {
+  document.getElementById('boot').textContent = '当前浏览器不支持 WebGL，换 Chrome / Edge 再试。';
+  throw e;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_SMALL ? 1.6 : 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = IS_SMALL ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.getElementById('scene').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x241f24, 0.016);
+
+const camera = new THREE.PerspectiveCamera(55, 1, 0.08, 220);
+const CAM_POS = new THREE.Vector3(0, 1.40, 2.24);
+const CAM_LOOK = new THREE.Vector3(0, 0.80, -0.45);
+camera.position.copy(CAM_POS);
+
+/* ================= 小工具 ================= */
+function mulberry(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const pick = (rng, arr) => arr[Math.floor(rng() * arr.length) % arr.length];
+
+function canvasTex(size, draw, repeat) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  draw(g, size);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat, repeat); }
+  return t;
+}
+
+/* 沿曲线放一根半径渐变的管子：用来做角，比一串球干净 */
+function taperedTube(curve, r0, r1, segs, radial) {
+  const frames = curve.computeFrenetFrames(segs, false);
+  const pos = [], idx = [];
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs;
+    const p = curve.getPointAt(t);
+    const r = r0 + (r1 - r0) * t;
+    const N = frames.normals[i], B = frames.binormals[i];
+    for (let j = 0; j <= radial; j++) {
+      const a = (j / radial) * Math.PI * 2;
+      const ca = Math.cos(a) * r, sa = Math.sin(a) * r;
+      pos.push(p.x + ca * N.x + sa * B.x, p.y + ca * N.y + sa * B.y, p.z + ca * N.z + sa * B.z);
+    }
+  }
+  for (let i = 0; i < segs; i++) {
+    for (let j = 0; j < radial; j++) {
+      const a = i * (radial + 1) + j;
+      const b = a + radial + 1;
+      idx.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/* 两点之间搭一根“肢体” */
+function limb(from, to, radius, mat, seg) {
+  const a = new THREE.Vector3().fromArray(from);
+  const b = new THREE.Vector3().fromArray(to);
+  const dir = new THREE.Vector3().subVectors(b, a);
+  const len = dir.length();
+  const geo = new THREE.CapsuleGeometry(radius, Math.max(0.001, len - radius * 0.6), 4, seg || 8);
+  const m = new THREE.Mesh(geo, mat);
+  m.position.copy(a).addScaledVector(dir, 0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+  m.castShadow = true;
+  return m;
+}
+
+/* ================= 贴图 ================= */
+const dirtTex = canvasTex(512, (g, S) => {
+  g.fillStyle = '#43351f'; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 2800; i++) {
+    const x = Math.random() * S, y = Math.random() * S, r = Math.random() * 2.4 + 0.3, v = Math.random();
+    g.fillStyle = v < 0.55
+      ? 'rgba(26,19,10,' + (0.05 + v * 0.28).toFixed(3) + ')'
+      : 'rgba(132,107,66,' + (0.03 + v * 0.16).toFixed(3) + ')';
+    g.beginPath(); g.arc(x, y, r, 0, 6.283); g.fill();
+  }
+  for (let i = 0; i < 260; i++) {
+    const x = Math.random() * S, y = Math.random() * S, a = Math.random() * 6.283, l = 6 + Math.random() * 15;
+    g.strokeStyle = 'rgba(' + (168 + Math.random() * 50 | 0) + ',' + (140 + Math.random() * 40 | 0) + ',72,' + (0.10 + Math.random() * 0.22).toFixed(3) + ')';
+    g.lineWidth = 1;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+  }
+}, 7);
+
+const plankTex = canvasTex(512, (g, S) => {
+  const rows = 6, h = S / rows;
+  for (let i = 0; i < rows; i++) {
+    const base = 74 + Math.random() * 26;
+    g.fillStyle = 'rgb(' + (base + 22 | 0) + ',' + (base - 4 | 0) + ',' + (base - 30 | 0) + ')';
+    g.fillRect(0, i * h, S, h);
+    g.fillStyle = 'rgba(18,12,7,.55)';
+    g.fillRect(0, i * h + h - 2, S, 2);
+    for (let k = 0; k < 26; k++) {
+      const y = i * h + Math.random() * h;
+      g.strokeStyle = 'rgba(38,24,12,' + (0.04 + Math.random() * 0.12).toFixed(3) + ')';
+      g.lineWidth = 0.7 + Math.random() * 1.2;
+      g.beginPath();
+      g.moveTo(0, y);
+      for (let x = 0; x <= S; x += 32) g.lineTo(x, y + Math.sin(x * 0.02 + k) * 2.4 + (Math.random() - 0.5) * 1.6);
+      g.stroke();
+    }
+  }
+}, 3);
+
+const tableTex = canvasTex(512, (g, S) => {
+  g.fillStyle = '#8b6236'; g.fillRect(0, 0, S, S);
+  const rows = 4, h = S / rows;
+  for (let i = 0; i < rows; i++) {
+    const v = 96 + Math.random() * 30;
+    g.fillStyle = 'rgb(' + (v + 42 | 0) + ',' + (v | 0) + ',' + (v - 54 | 0) + ')';
+    g.fillRect(0, i * h, S, h - 3);
+    g.fillStyle = 'rgba(24,14,6,.6)';
+    g.fillRect(0, i * h + h - 3, S, 3);
+    for (let k = 0; k < 40; k++) {
+      const y = i * h + Math.random() * (h - 4);
+      g.strokeStyle = 'rgba(52,30,14,' + (0.04 + Math.random() * 0.14).toFixed(3) + ')';
+      g.lineWidth = 0.6 + Math.random();
+      g.beginPath();
+      g.moveTo(0, y);
+      for (let x = 0; x <= S; x += 26) g.lineTo(x, y + Math.sin(x * 0.024 + k * 1.7) * 2 + (Math.random() - 0.5) * 1.4);
+      g.stroke();
+    }
+  }
+  for (let i = 0; i < 9; i++) {
+    const x = Math.random() * S, y = Math.random() * S, r = 3 + Math.random() * 10;
+    const rg = g.createRadialGradient(x, y, 0, x, y, r * 3);
+    rg.addColorStop(0, 'rgba(40,20,6,.34)'); rg.addColorStop(1, 'rgba(40,20,6,0)');
+    g.fillStyle = rg; g.beginPath(); g.arc(x, y, r * 3, 0, 6.283); g.fill();
+  }
+}, 1);
+
+const cowSpotTex = canvasTex(256, (g, S) => {
+  g.fillStyle = '#f2ecdf'; g.fillRect(0, 0, S, S);
+  g.fillStyle = '#1d1a18';
+  for (let i = 0; i < 7; i++) {
+    const x = Math.random() * S, y = Math.random() * S, r = 20 + Math.random() * 34;
+    g.beginPath();
+    for (let a = 0; a < 12; a++) {
+      const ang = a / 12 * 6.283, rr = r * (0.62 + Math.random() * 0.55);
+      const px = x + Math.cos(ang) * rr, py = y + Math.sin(ang) * rr;
+      a ? g.lineTo(px, py) : g.moveTo(px, py);
+    }
+    g.closePath(); g.fill();
+  }
+});
+
+/* ================= 灯光 ================= */
+const hemi = new THREE.HemisphereLight(0x6b83b8, 0x2b2118, 0.42);
+scene.add(hemi);
+
+const sun = new THREE.DirectionalLight(0xff9c5e, 0.95);
+sun.position.set(-7.5, 6.2, 5.5);
+sun.castShadow = true;
+sun.shadow.mapSize.set(IS_SMALL ? 1024 : 2048, IS_SMALL ? 1024 : 2048);
+const sd = 8.5;
+sun.shadow.camera.left = -sd; sun.shadow.camera.right = sd;
+sun.shadow.camera.top = sd; sun.shadow.camera.bottom = -sd;
+sun.shadow.camera.near = 0.5; sun.shadow.camera.far = 34;
+sun.shadow.bias = -0.0009;
+sun.shadow.normalBias = 0.02;
+scene.add(sun);
+scene.add(sun.target);
+sun.target.position.set(0, 0.6, 0);
+
+const moon = new THREE.DirectionalLight(0x9db8ff, 0.6);
+moon.position.set(5.5, 7.5, 4.5);
+scene.add(moon);
+
+/* 观众席方向的冷补光：只为了让正脸不至于糊成一团橙 */
+const roomFill = new THREE.PointLight(0x8fa7c8, 1.15, 7, 2);
+roomFill.position.set(0, 1.55, 2.3);
+scene.add(roomFill);
+
+/* ================= 天空 / 星星 ================= */
+{
+  const skyTex = canvasTex(64, (g, S) => {
+    const grd = g.createLinearGradient(0, 0, 0, S);
+    grd.addColorStop(0.00, '#0d1730');
+    grd.addColorStop(0.34, '#2a3457');
+    grd.addColorStop(0.58, '#6a4a63');
+    grd.addColorStop(0.74, '#c66b45');
+    grd.addColorStop(0.86, '#e79a5a');
+    grd.addColorStop(1.00, '#3a2a24');
+    g.fillStyle = grd; g.fillRect(0, 0, S, S);
+  });
+  skyTex.mapping = THREE.EquirectangularReflectionMapping;
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(110, 32, 20),
+    new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false, depthWrite: false })
+  );
+  scene.add(sky);
+
+  const starN = IS_SMALL ? 260 : 520;
+  const pos = new Float32Array(starN * 3);
+  const rng = mulberry(20261120);
+  for (let i = 0; i < starN; i++) {
+    const u = rng() * Math.PI * 2, v = Math.acos(rng() * 0.85 + 0.02);
+    const r = 96;
+    pos[i * 3] = Math.sin(v) * Math.cos(u) * r;
+    pos[i * 3 + 1] = Math.cos(v) * r * 0.92 + 6;
+    pos[i * 3 + 2] = Math.sin(v) * Math.sin(u) * r;
+  }
+  const sg = new THREE.BufferGeometry();
+  sg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  scene.add(new THREE.Points(sg, new THREE.PointsMaterial({
+    color: 0xcfe0ff, size: 0.55, sizeAttenuation: true, transparent: true,
+    opacity: 0.85, depthWrite: false, fog: false
+  })));
+}
+
+/* ================= 地面 ================= */
+{
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(46, 64),
+    new THREE.MeshStandardMaterial({ map: dirtTex, color: 0xb7a68a, roughness: 1, metalness: 0 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  /* 踩实的一小块泥地 */
+  const patch = new THREE.Mesh(
+    new THREE.CircleGeometry(3.1, 40),
+    new THREE.MeshStandardMaterial({ color: 0x3a2b19, roughness: 1, transparent: true, opacity: 0.55, depthWrite: false })
+  );
+  patch.rotation.x = -Math.PI / 2;
+  patch.position.y = 0.004;
+  scene.add(patch);
+}
+
+/* ================= 桌子 + 长凳 ================= */
+const TABLE_Y = 0.66;
+const SEAT_Y = 0.44;
+{
+  scene.add((() => {
+    const woodMat = new THREE.MeshStandardMaterial({ map: tableTex, roughness: 0.82, metalness: 0.03 });
+    const darkWood = new THREE.MeshStandardMaterial({ color: 0x3b2a1a, roughness: 0.9 });
+    const g = new THREE.Group();
+
+    const top = new THREE.Mesh(new THREE.BoxGeometry(2.10, 0.085, 1.34), woodMat);
+    top.position.y = TABLE_Y - 0.043;
+    top.castShadow = true; top.receiveShadow = true;
+    g.add(top);
+
+    /* 桌沿一圈老木头边 */
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(2.24, 0.05, 1.04), darkWood);
+    edge.position.y = TABLE_Y - 0.12;
+    g.add(edge);
+
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.11, TABLE_Y - 0.09, 0.11), darkWood);
+      leg.position.set(sx * 0.92, (TABLE_Y - 0.09) / 2, sz * 0.54);
+      leg.castShadow = true;
+      g.add(leg);
+    }
+    const brace = new THREE.Mesh(new THREE.BoxGeometry(1.84, 0.07, 0.07), darkWood);
+    brace.position.y = 0.26; g.add(brace.clone());
+    const brace2 = brace.clone(); brace2.rotation.y = Math.PI / 2; brace2.scale.x = 0.62; g.add(brace2);
+
+    return g;
+  })());
+
+  /* 四条长凳 */
+  const benchMat = new THREE.MeshStandardMaterial({ map: plankTex, color: 0xc9a377, roughness: 0.9 });
+  const benchLegMat = new THREE.MeshStandardMaterial({ color: 0x33251a, roughness: 0.95 });
+  const benches = [
+    [0, 0, 1.00, 0], [0, 0, -1.00, 0], [-1.24, 0, 0, Math.PI / 2], [1.24, 0, 0, Math.PI / 2]
+  ];
+  for (const [x, , z, ry] of benches) {
+    const b = new THREE.Group();
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.075, 0.34), benchMat);
+    seat.position.y = SEAT_Y - 0.037;
+    seat.castShadow = true; seat.receiveShadow = true;
+    b.add(seat);
+    for (const sx of [-0.38, 0.38]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, SEAT_Y - 0.05, 0.26), benchLegMat);
+      leg.position.set(sx, (SEAT_Y - 0.05) / 2, 0);
+      leg.castShadow = true;
+      b.add(leg);
+    }
+    b.position.set(x, 0, z);
+    b.rotation.y = ry;
+    scene.add(b);
+  }
+}
+
+/* ================= 桌上小物 ================= */
+{
+  const woodMat = new THREE.MeshStandardMaterial({ map: plankTex, color: 0xb98f5f, roughness: 0.9 });
+  const darkMetal = new THREE.MeshStandardMaterial({ color: 0x2a2a2c, roughness: 0.42, metalness: 0.85 });
+  const glassMat = new THREE.MeshStandardMaterial({
+    color: 0x9fb6c4, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.34
+  });
+
+  /* 牌堆（第 2 步再变成真牌） */
+  const deck = new THREE.Group();
+  const cardBackTex = canvasTex(128, (g, S) => {
+    g.fillStyle = '#8d2b24'; g.fillRect(0, 0, S, S);
+    g.strokeStyle = 'rgba(255,226,180,.55)'; g.lineWidth = 3;
+    g.strokeRect(9, 9, S - 18, S - 18);
+    g.beginPath(); g.arc(S / 2, S / 2, 26, 0, 6.283); g.stroke();
+    g.beginPath(); g.moveTo(S / 2, S / 2 - 20); g.lineTo(S / 2, S / 2 + 20); g.stroke();
+  });
+  const cardMat = new THREE.MeshStandardMaterial({ color: 0xe9e0cc, roughness: 0.75 });
+  const backMat = new THREE.MeshStandardMaterial({ map: cardBackTex, roughness: 0.75 });
+  for (let i = 0; i < 6; i++) {
+    const c = new THREE.Mesh(new THREE.BoxGeometry(0.088, 0.006, 0.124),
+      [cardMat, cardMat, i === 5 ? backMat : cardMat, cardMat, cardMat, cardMat]);
+    c.position.set(-0.62 + (Math.random() - 0.5) * 0.012, TABLE_Y + 0.004 + i * 0.0062, 0.28 + (Math.random() - 0.5) * 0.01);
+    c.rotation.y = (Math.random() - 0.5) * 0.16;
+    c.castShadow = true;
+    deck.add(c);
+  }
+  scene.add(deck);
+
+  /* 酒瓶 */
+  const bottle = new THREE.Group();
+  const glassBottle = new THREE.MeshStandardMaterial({ color: 0x3f5a3a, roughness: 0.18, metalness: 0.15, transparent: true, opacity: 0.85 });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.24, 14), glassBottle);
+  body.position.y = 0.12; bottle.add(body);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.045, 0.1, 12), glassBottle);
+  neck.position.y = 0.28; bottle.add(neck);
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.021, 0.02, 10), darkMetal);
+  cap.position.y = 0.34; bottle.add(cap);
+  bottle.position.set(0.72, TABLE_Y, -0.36);
+  bottle.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  scene.add(bottle);
+
+  /* 两只玻璃杯 */
+  const glassGeo = new THREE.CylinderGeometry(0.038, 0.031, 0.11, 14, 1, true);
+  for (const [x, z] of [[0.52, -0.42], [0.86, -0.28]]) {
+    const cup = new THREE.Mesh(glassGeo, glassMat);
+    cup.position.set(x, TABLE_Y + 0.055, z);
+    scene.add(cup);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.031, 0.031, 0.006, 14), glassMat);
+    base.position.set(x, TABLE_Y + 0.003, z);
+    scene.add(base);
+  }
+
+  /* 每人的枪在牌局开始时摆上桌（见下方 placeGuns） */
+
+  /* 一个木箱当背景 */
+  const crate = new THREE.Group();
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.52, 0.62), woodMat);
+  box.position.y = 0.26; box.castShadow = true; box.receiveShadow = true;
+  crate.add(box);
+  for (const y of [0.1, 0.42]) {
+    const band = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.045, 0.65),
+      new THREE.MeshStandardMaterial({ color: 0x2f2216, roughness: 0.95 }));
+    band.position.y = y; crate.add(band);
+  }
+  crate.position.set(2.15, 0, -1.55);
+  crate.rotation.y = 0.4;
+  scene.add(crate);
+}
+
+/* ================= 栅栏 ================= */
+{
+  const postMat = new THREE.MeshStandardMaterial({ map: plankTex, color: 0x9a7a55, roughness: 0.95 });
+  const railMat = new THREE.MeshStandardMaterial({ map: plankTex, color: 0x8d6f4d, roughness: 0.95 });
+  const postGeo = new THREE.BoxGeometry(0.1, 1.25, 0.1);
+  const railGeo = new THREE.BoxGeometry(1, 0.075, 0.05);
+  const fence = new THREE.Group();
+
+  function run(x1, z1, x2, z2, gapAt) {
+    const dx = x2 - x1, dz = z2 - z1;
+    const len = Math.hypot(dx, dz);
+    const n = Math.max(2, Math.round(len / 1.05));
+    const ang = Math.atan2(dx, dz);
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      const x = x1 + dx * t, z = z1 + dz * t;
+      if (gapAt && Math.abs(x - gapAt[0]) < 1.15 && Math.abs(z - gapAt[1]) < 1.15) continue;
+      const p = new THREE.Mesh(postGeo, postMat);
+      p.position.set(x, 0.55 + Math.random() * 0.06, z);
+      p.rotation.y = (Math.random() - 0.5) * 0.12;
+      p.castShadow = true; p.receiveShadow = true;
+      fence.add(p);
+    }
+    for (let r = 0; r < 2; r++) {
+      const y = 0.52 + r * 0.42;
+      for (let i = 0; i < n; i++) {
+        const t0 = i / n, t1 = (i + 1) / n;
+        const xa = x1 + dx * t0, za = z1 + dz * t0;
+        const xb = x1 + dx * t1, zb = z1 + dz * t1;
+        if (gapAt && Math.abs((xa + xb) / 2 - gapAt[0]) < 1.15 && Math.abs((za + zb) / 2 - gapAt[1]) < 1.15) continue;
+        const rail = new THREE.Mesh(railGeo, railMat);
+        rail.scale.x = Math.hypot(xb - xa, zb - za);
+        rail.position.set((xa + xb) / 2, y + (Math.random() - 0.5) * 0.03, (za + zb) / 2);
+        rail.rotation.y = ang + Math.PI / 2;
+        rail.rotation.z = (Math.random() - 0.5) * 0.015;
+        rail.castShadow = true;
+        fence.add(rail);
+      }
+    }
+  }
+
+  run(-8, -7, 8, -7, [0, -7]);
+  run(-8, 7, 8, 7);
+  run(-8, -7, -8, 7);
+  run(8, -7, 8, 7);
+  scene.add(fence);
+}
+
+/* ================= 树 + 灯柱 + 灯泡串 ================= */
+const lanternRig = { group: null, light: null };
+{
+  /* 树 */
+  const tree = new THREE.Group();
+  const barkMat = new THREE.MeshStandardMaterial({ color: 0x3d2c1d, roughness: 0.95 });
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0x23301f, roughness: 1, flatShading: true });
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.22, 2.9, 9), barkMat);
+  trunk.position.y = 1.45; trunk.castShadow = true;
+  tree.add(trunk);
+  for (let i = 0; i < 5; i++) {
+    const a = i / 5 * 6.283 + 0.4;
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.07, 1.3, 6), barkMat);
+    b.position.set(Math.cos(a) * 0.34, 2.4 + Math.sin(i) * 0.28, Math.sin(a) * 0.34);
+    b.rotation.z = Math.cos(a) * 0.7; b.rotation.x = Math.sin(a) * 0.7;
+    tree.add(b);
+  }
+  for (let i = 0; i < 7; i++) {
+    const a = i / 7 * 6.283;
+    const r = 1.1 + Math.random() * 0.7;
+    const blob = new THREE.Mesh(new THREE.IcosahedronGeometry(0.75 + Math.random() * 0.5, 1), leafMat);
+    blob.position.set(Math.cos(a) * r, 3.1 + Math.random() * 0.85, Math.sin(a) * r);
+    blob.castShadow = true;
+    tree.add(blob);
+  }
+  tree.position.set(-3.9, 0, -3.1);
+  scene.add(tree);
+
+  /* 灯柱 */
+  const poleMat = new THREE.MeshStandardMaterial({ map: plankTex, color: 0x6f5638, roughness: 0.95 });
+  const pole = new THREE.Group();
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.07, 2.6, 8), poleMat);
+  m.position.y = 1.3; m.castShadow = true;
+  pole.add(m);
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 0.72, 8), poleMat);
+  arm.rotation.z = Math.PI / 2;
+  arm.position.set(-0.34, 2.27, 0);
+  pole.add(arm);
+  pole.position.set(1.98, 0, -0.42);
+  pole.rotation.y = -0.12;
+  scene.add(pole);
+
+  /* 煤油灯（会晃） */
+  const rig = new THREE.Group();
+  rig.position.set(1.30, 2.25, -0.42);
+  const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.42, 5),
+    new THREE.MeshStandardMaterial({ color: 0x2b241a, roughness: 1 }));
+  rope.position.y = -0.21;
+  rig.add(rope);
+
+  const lamp = new THREE.Group();
+  lamp.position.y = -0.62;
+  const metalMat = new THREE.MeshStandardMaterial({ color: 0x39302a, roughness: 0.55, metalness: 0.7 });
+  const glassMat = new THREE.MeshStandardMaterial({
+    color: 0xffc98a, emissive: 0xff9d43, emissiveIntensity: 1.7, roughness: 0.28,
+    transparent: true, opacity: 0.94
+  });
+  const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.19, 12), glassMat);
+  lamp.add(glass);
+  const topCap = new THREE.Mesh(new THREE.ConeGeometry(0.105, 0.08, 12), metalMat);
+  topCap.position.y = 0.13; lamp.add(topCap);
+  const botCap = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.075, 0.05, 12), metalMat);
+  botCap.position.y = -0.11; lamp.add(botCap);
+  const hook = new THREE.Mesh(new THREE.TorusGeometry(0.032, 0.006, 5, 10, Math.PI), metalMat);
+  hook.position.y = 0.2; lamp.add(hook);
+  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.024, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffd7a0 }));
+  flame.position.y = -0.01;
+  lamp.add(flame);
+  rig.add(lamp);
+
+  const lampLight = new THREE.PointLight(0xffbe86, 6.0, 9.5, 2);
+  lampLight.position.set(0, -0.6, 0);
+  lampLight.castShadow = !IS_SMALL;
+  if (lampLight.castShadow) {
+    lampLight.shadow.mapSize.set(512, 512);
+    lampLight.shadow.camera.near = 0.1;
+    lampLight.shadow.camera.far = 12;
+    lampLight.shadow.bias = -0.004;
+  }
+  rig.add(lampLight);
+  scene.add(rig);
+  lanternRig.group = rig;
+  lanternRig.light = lampLight;
+  lanternRig.lamp = lamp;
+
+  /* 灯泡串 */
+  const wireMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1 });
+  const bulbMat = new THREE.MeshStandardMaterial({
+    color: 0xffd9a0, emissive: 0xffb75c, emissiveIntensity: 3.4, roughness: 0.4
+  });
+  const bulbGeo = new THREE.SphereGeometry(0.035, 8, 8);
+  const strands = [
+    [[-3.6, 2.55, -3.0], [-1.2, 2.2, -2.0], [1.1, 2.05, -1.7], [3.0, 2.45, -1.35]],
+    [[-3.9, 2.4, -3.2], [-5.2, 2.0, -1.2], [-5.6, 1.85, 1.1]]
+  ];
+  for (const pts of strands) {
+    const curve = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(...p)));
+    const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 26, 0.007, 4, false), wireMat);
+    scene.add(tube);
+    const n = Math.max(3, Math.round(curve.getLength() * 2.4));
+    for (let i = 1; i < n; i++) {
+      const p = curve.getPointAt(i / n);
+      const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+      bulb.position.copy(p).y -= 0.045;
+      scene.add(bulb);
+    }
+  }
+  const fill = new THREE.PointLight(0xffc48a, 2.2, 14, 2);
+  fill.position.set(-1.0, 1.9, -2.0);
+  scene.add(fill);
+}
+
+/* ================= 草垛 / 水槽 / 狗屋 / 散草 ================= */
+{
+  const strawMat = new THREE.MeshStandardMaterial({ color: 0xb99a4e, roughness: 1, flatShading: true });
+  const woodMat = new THREE.MeshStandardMaterial({ map: plankTex, color: 0x7d6142, roughness: 0.95 });
+
+  /* 草垛 */
+  for (const [x, z, ry] of [[-3.1, 2.4, 0.3], [-2.3, 3.0, 0.9], [3.3, 2.6, -0.4]]) {
+    const bale = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 1.15, 14), strawMat);
+    body.rotation.z = Math.PI / 2;
+    body.position.y = 0.46;
+    body.castShadow = true; body.receiveShadow = true;
+    bale.add(body);
+    for (const bx of [-0.32, 0.32]) {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.465, 0.012, 4, 14),
+        new THREE.MeshStandardMaterial({ color: 0x5a4423, roughness: 1 }));
+      band.rotation.y = Math.PI / 2;
+      band.position.set(bx, 0.46, 0);
+      bale.add(band);
+    }
+    bale.position.set(x, 0, z);
+    bale.rotation.y = ry;
+    scene.add(bale);
+  }
+
+  /* 水槽 */
+  const trough = new THREE.Group();
+  const outer = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.46, 0.6), woodMat);
+  outer.position.y = 0.23; outer.castShadow = true; outer.receiveShadow = true;
+  trough.add(outer);
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(1.52, 0.46),
+    new THREE.MeshStandardMaterial({ color: 0x1d2a30, roughness: 0.08, metalness: 0.55 }));
+  water.rotation.x = -Math.PI / 2;
+  water.position.y = 0.4;
+  trough.add(water);
+  trough.position.set(-4.6, 0, 1.9);
+  trough.rotation.y = 0.22;
+  scene.add(trough);
+
+  /* 狗屋 */
+  const kennel = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.72, 0.85), woodMat);
+  base.position.y = 0.36; base.castShadow = true; base.receiveShadow = true;
+  kennel.add(base);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, 0.06),
+    new THREE.MeshStandardMaterial({ color: 0x0e0b08, roughness: 1 }));
+  door.position.set(0, 0.32, 0.43);
+  kennel.add(door);
+  for (const sx of [-1, 1]) {
+    const slope = new THREE.Mesh(new THREE.BoxGeometry(1.06, 0.05, 0.58), woodMat);
+    slope.position.set(0, 0.82, sx * 0.22);
+    slope.rotation.x = sx * 0.52;
+    slope.castShadow = true;
+    kennel.add(slope);
+  }
+  kennel.position.set(3.9, 0, 1.3);
+  kennel.rotation.y = -0.85;
+  scene.add(kennel);
+
+  /* 地上的散草 */
+  const rng = mulberry(7788);
+  const strawGeo = new THREE.BoxGeometry(0.012, 0.012, 0.16);
+  const strawCount = IS_SMALL ? 70 : 150;
+  const strawMesh = new THREE.InstancedMesh(strawGeo, strawMat, strawCount);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1);
+  for (let i = 0; i < strawCount; i++) {
+    const a = rng() * 6.283, r = 1.0 + rng() * 4.0;
+    const p = new THREE.Vector3(Math.cos(a) * r, 0.008, Math.sin(a) * r * 0.8);
+    q.setFromEuler(new THREE.Euler(0, rng() * 6.283, (rng() - 0.5) * 0.1));
+    m4.compose(p, q, s);
+    strawMesh.setMatrixAt(i, m4);
+  }
+  strawMesh.receiveShadow = true;
+  scene.add(strawMesh);
+}
+
+/* ================= 氛围：薄雾 / 光柱 / 飞蛾 / 浮尘 ================= */
+const hazeSprites = [];
+const moths = [];
+let dustPoints = null;
+const _v1 = new THREE.Vector3();
+{
+  const hazeTex = canvasTex(128, (g, S) => {
+    const rg = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+    rg.addColorStop(0, 'rgba(210,218,230,0.5)');
+    rg.addColorStop(0.55, 'rgba(180,192,210,0.16)');
+    rg.addColorStop(1, 'rgba(160,175,195,0)');
+    g.fillStyle = rg; g.fillRect(0, 0, S, S);
+  });
+  for (let i = 0; i < 14; i++) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: hazeTex, transparent: true, opacity: 0.05 + Math.random() * 0.06,
+      depthWrite: false, color: 0xa8b6cc
+    }));
+    const r = 1.8 + Math.random() * 5.5, a = Math.random() * 6.283;
+    s.position.set(Math.cos(a) * r, 0.2 + Math.random() * 1.0, Math.sin(a) * r);
+    s.scale.setScalar(1.8 + Math.random() * 2.6);
+    s.renderOrder = 2;
+    s.userData = { base: s.position.clone(), ph: Math.random() * 6.283, sp: 0.04 + Math.random() * 0.07 };
+    scene.add(s);
+    hazeSprites.push(s);
+  }
+
+  /* 灯下的光柱：用一张渐变图当 alpha，边缘才不会像一块硬三角形 */
+  if (lanternRig.lamp) {
+    const coneTex = canvasTexWH(32, 128, (g, W, H) => {
+      const grd = g.createLinearGradient(0, 0, 0, H);
+      grd.addColorStop(0, 'rgba(255,255,255,0.95)');
+      grd.addColorStop(0.45, 'rgba(255,255,255,0.36)');
+      grd.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = grd; g.fillRect(0, 0, W, H);
+    });
+    const cone = new THREE.Mesh(
+      new THREE.ConeGeometry(0.95, 1.75, 28, 1, true),
+      new THREE.MeshBasicMaterial({
+        map: coneTex, color: 0xffb877, transparent: true, opacity: 0.22,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+      })
+    );
+    cone.position.y = -0.87;
+    lanternRig.lamp.add(cone);
+  }
+
+  /* 绕着灯飞的小蛾子 */
+  const mothGeo = new THREE.SphereGeometry(0.009, 5, 5);
+  const mothMat = new THREE.MeshBasicMaterial({ color: 0x3a3128 });
+  for (let i = 0; i < 6; i++) {
+    const m = new THREE.Mesh(mothGeo, mothMat);
+    m.userData = { r: 0.18 + Math.random() * 0.3, ph: Math.random() * 6.283, sp: 1.4 + Math.random() * 1.6, y: Math.random() * 0.4 };
+    scene.add(m);
+    moths.push(m);
+  }
+
+  /* 灯下的浮尘 */
+  const N = IS_SMALL ? 60 : 140;
+  const pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    pos[i * 3] = 1.30 + (Math.random() - 0.5) * 1.2;
+    pos[i * 3 + 1] = 0.7 + Math.random() * 1.2;
+    pos[i * 3 + 2] = -0.42 + (Math.random() - 0.5) * 1.2;
+  }
+  const dg = new THREE.BufferGeometry();
+  dg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  dustPoints = new THREE.Points(dg, new THREE.PointsMaterial({
+    color: 0xffd9a8, size: 0.012, transparent: true, opacity: 0.5, depthWrite: false,
+    blending: THREE.AdditiveBlending
+  }));
+  scene.add(dustPoints);
+}
+/* ================= 动物 ================= */
+const SPECIES = {
+  cat: {
+    cn: '猫', emoji: '🐱', scale: 0.95,
+    bodyR: 0.145, bodyL: 0.24, headR: 0.150, girth: 1.00, neck: 0.10,
+    fur: [['#8d929b', '#5f646d'], ['#cf8a50', '#a86a35'], ['#3b3b42', '#26262b'], ['#e8e2d6', '#c3bcae']],
+    iris: 0x86c94f, pupil: 'slit', striped: true
+  },
+  dog: {
+    cn: '狗', emoji: '🐶', scale: 1.04,
+    bodyR: 0.180, bodyL: 0.28, headR: 0.172, girth: 1.06, neck: 0.08,
+    fur: [['#c8934f', '#8a5f31'], ['#7a5a3a', '#4d3622'], ['#ece3d1', '#c9bfa9']],
+    iris: 0x53341f, pupil: 'round', collar: true
+  },
+  pig: {
+    cn: '猪', emoji: '🐷', scale: 0.99,
+    bodyR: 0.225, bodyL: 0.24, headR: 0.165, girth: 1.12, neck: 0.06,
+    fur: [['#e3a4ab', '#c47d88'], ['#d99aa1', '#b1737d']],
+    iris: 0x33201a, pupil: 'round'
+  },
+  cow: {
+    cn: '牛', emoji: '🐮', scale: 1.12,
+    bodyR: 0.215, bodyL: 0.30, headR: 0.185, girth: 1.02, neck: 0.14,
+    fur: [['#f2ecdf', '#1d1a18'], ['#9a7350', '#33241a']],
+    iris: 0x1f1813, pupil: 'round', bell: true
+  },
+  goat: {
+    cn: '山羊', emoji: '🐐', scale: 1.0,
+    bodyR: 0.205, bodyL: 0.30, headR: 0.145, girth: 0.94, neck: 0.12,
+    fur: [['#e9e4d8', '#4a4038'], ['#b9a68c', '#3c322a'], ['#6b5b4a', '#2f2823']],
+    iris: 0xd8b45a, pupil: 'hslit'
+  }
+};
+
+const NAMES = {
+  cat: ['阿橘', '煤球', '三花', '豆豆', '大咪'],
+  dog: ['大黄', '来福', '旺财', '豆包', '老黑'],
+  pig: ['花卷', '胖墩', '二师兄', '肉肉', '小蹄'],
+  cow: ['大壮', '奶牛', '铁柱', '阿花', '牛牛'],
+  goat: ['老白', '阿角', '铁头', '胡子', '二羊']
+};
+
+/* 猫的虎斑：竖纹沿着身体纵轴走 */
+const catStripeTex = canvasTex(256, (g, S) => {
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, S, S);
+  g.fillStyle = 'rgba(52,34,20,.3)';
+  for (let i = 0; i < 7; i++) {
+    const x = i * S / 7 + 6;
+    g.beginPath();
+    g.moveTo(x, 0);
+    for (let y = 0; y <= S; y += 18) g.lineTo(x + Math.sin(y * 0.035 + i) * 5, y);
+    for (let y = S; y >= 0; y -= 18) g.lineTo(x + 9 + Math.sin(y * 0.035 + i) * 5, y);
+    g.fill();
+  }
+}, 2);
+
+/* 眼睛：眼白 + 虹膜 + 瞳孔 + 高光，整组一起眨 */
+function makeEye(HR, irisColor, shape) {
+  const grp = new THREE.Group();
+  /* 山羊这类：没有眼白，整颗是琥珀色的眼球 + 一条横瞳 */
+  if (shape === 'hslit') {
+    const ball = new THREE.Mesh(
+      new THREE.SphereGeometry(HR * 0.2, 14, 12),
+      new THREE.MeshStandardMaterial({ color: irisColor, roughness: 0.18 })
+    );
+    ball.scale.z = 0.85;
+    grp.add(ball);
+    const pupil = new THREE.Mesh(
+      new THREE.SphereGeometry(HR * 0.075, 10, 10),
+      new THREE.MeshBasicMaterial({ color: 0x0b0908 })
+    );
+    pupil.position.z = HR * 0.135;
+    pupil.scale.set(2.45, 0.52, 0.5);
+    grp.add(pupil);
+    const glint = new THREE.Mesh(
+      new THREE.SphereGeometry(HR * 0.03, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    glint.position.set(HR * 0.055, HR * 0.06, HR * 0.17);
+    grp.add(glint);
+    return grp;
+  }
+  const eyeball = new THREE.Mesh(
+    new THREE.SphereGeometry(HR * 0.175, 14, 12),
+    new THREE.MeshStandardMaterial({ color: 0xfaf5ec, roughness: 0.26 })
+  );
+  eyeball.scale.z = 0.85;
+  grp.add(eyeball);
+  const iris = new THREE.Mesh(
+    new THREE.SphereGeometry(HR * 0.118, 14, 12),
+    new THREE.MeshStandardMaterial({ color: irisColor, roughness: 0.2 })
+  );
+  iris.position.z = HR * 0.075;
+  iris.scale.set(1, 1, 0.55);
+  grp.add(iris);
+  const pupil = new THREE.Mesh(
+    new THREE.SphereGeometry(HR * 0.06, 10, 10),
+    new THREE.MeshBasicMaterial({ color: 0x0c0908 })
+  );
+  pupil.position.z = HR * 0.125;
+  if (shape === 'slit') pupil.scale.set(0.4, 1.5, 0.5);
+  else if (shape === 'hslit') pupil.scale.set(1.75, 0.62, 0.5);
+  else pupil.scale.set(1, 1, 0.45);
+  grp.add(pupil);
+  const glint = new THREE.Mesh(
+    new THREE.SphereGeometry(HR * 0.028, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  );
+  glint.position.set(HR * 0.045, HR * 0.055, HR * 0.155);
+  grp.add(glint);
+  return grp;
+}
+
+/* 爪 / 蹄 */
+function makePaw(kind, R, mat, tipMat) {
+  const grp = new THREE.Group();
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(R * 0.27, 10, 8), mat);
+  palm.scale.set(1.02, 0.6, 1.15);
+  palm.castShadow = true;
+  grp.add(palm);
+  if (kind === 'cow' || kind === 'goat') {
+    for (const k of [-1, 1]) {
+      const hoof = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.095, R * 0.11, R * 0.14, 8), tipMat);
+      hoof.position.set(k * R * 0.09, -R * 0.075, R * 0.02);
+      hoof.castShadow = true;
+      grp.add(hoof);
+    }
+  } else {
+    for (const k of [-1, 0, 1]) {
+      const toe = new THREE.Mesh(new THREE.SphereGeometry(R * 0.086, 8, 8), tipMat);
+      toe.position.set(k * R * 0.125, -R * 0.045, R * 0.135);
+      toe.scale.set(1, 0.85, 1.2);
+      toe.castShadow = true;
+      grp.add(toe);
+    }
+  }
+  return grp;
+}
+
+function buildAnimal(kind, rng) {
+  const sp = SPECIES[kind];
+  const pal = pick(rng, sp.fur);
+  const furColor = pal[0], darkColor = pal[1];
+
+  const furMat = new THREE.MeshStandardMaterial({ color: furColor, roughness: 0.86 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: darkColor, roughness: 0.9 });
+  const noseMat = new THREE.MeshStandardMaterial({ color: 0x35231e, roughness: 0.4 });
+  const innerMat = new THREE.MeshStandardMaterial({ color: 0xc98a86, roughness: 0.85 });
+
+  if (kind === 'cow') {
+    furMat.map = cowSpotTex;
+    furMat.color.set(pal[0] === '#f2ecdf' ? 0xffffff : 0x9a7350);
+  }
+  if (kind === 'pig') furMat.roughness = 0.68;
+  /* 猫的条纹只放在躯干上，头和四肢保持纯色，否则像灯芯绒 */
+  let torsoMat = furMat;
+  if (kind === 'cat') {
+    torsoMat = new THREE.MeshStandardMaterial({ map: catStripeTex, color: furColor, roughness: 0.85 });
+  }
+
+  const g = new THREE.Group();
+  const R = sp.bodyR, L = sp.bodyL, HR = sp.headR;
+
+  /* ---- 躯干：旋转体，屁股厚、胸宽、脖子收，比胶囊有人味 ---- */
+  const bodyH = L + R * 1.55;
+  const prof = [
+    [0.001, 0.00],
+    [0.74 * R, 0.05 * bodyH],
+    [0.97 * R, 0.20 * bodyH],
+    [1.00 * R, 0.42 * bodyH],
+    [0.96 * R, 0.62 * bodyH],
+    [0.82 * R, 0.80 * bodyH],
+    [0.58 * R, 0.92 * bodyH],
+    [0.40 * R, 1.00 * bodyH]
+  ].map(p => new THREE.Vector2(p[0] * sp.girth, p[1]));
+  const torso = new THREE.Mesh(new THREE.LatheGeometry(prof, 26), torsoMat);
+  torso.position.y = 0.02;
+  torso.scale.set(1.02, 1, 0.92);
+  torso.castShadow = true;
+  g.add(torso);
+
+  const topY = 0.02 + bodyH;
+  const shoulderY = 0.02 + bodyH * 0.85;
+  const headY = topY + sp.neck + HR * 0.55;
+
+  /* ---- 脖子 ---- */
+  g.add(limb([0, topY - HR * 0.35, 0.01], [0, headY - HR * 0.3, 0.03], R * 0.5, furMat, 12));
+
+  /* ---- 后腿（蹲在身下，大部分被桌子挡住） ---- */
+  for (const sx of [-1, 1]) {
+    g.add(limb([sx * R * 0.6, 0.22, -0.04], [sx * R * 0.68, 0.02, 0.14], R * 0.29, furMat, 7));
+    const foot = new THREE.Mesh(new THREE.SphereGeometry(R * 0.2, 8, 8), darkMat);
+    foot.position.set(sx * R * 0.68, 0.02, 0.16);
+    foot.scale.set(1, 0.7, 1.3);
+    g.add(foot);
+  }
+
+  /* ---- 前腿：上臂 + 小臂 + 爪，搭在桌沿 ---- */
+  const pawY = 0.245, pawZ = 0.33;
+  for (const sx of [-1, 1]) {
+    const sh = [sx * R * 0.6, shoulderY - 0.1, 0.03];
+    const el = [sx * R * 0.86, shoulderY - 0.3, 0.155];
+    const wr = [sx * R * 0.8, pawY + 0.055, pawZ - 0.03];
+    g.add(limb(sh, el, R * 0.285, furMat, 7));
+    g.add(limb(el, wr, R * 0.24, furMat, 7));
+    const paw = makePaw(kind, R, furMat, darkMat);
+    paw.position.set(sx * R * 0.8, pawY, pawZ);
+    g.add(paw);
+  }
+
+  /* ---- 头 ---- */
+  const head = new THREE.Group();
+  head.position.set(0, headY, 0.03);
+  head.rotation.x = 0.07;
+  g.add(head);
+
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(HR, 20, 16), furMat);
+  skull.scale.set(1, 0.95, 1.02);
+  skull.castShadow = true;
+  head.add(skull);
+
+  /* 脸颊 */
+  const cheeks = [];
+  for (const sx of [-1, 1]) {
+    const cheek = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.4, 10, 10), furMat);
+    cheek.position.set(sx * HR * 0.52, -HR * 0.22, HR * 0.5);
+    cheek.scale.set(1, 0.9, 0.8);
+    head.add(cheek);
+    cheeks.push(cheek);
+  }
+
+  const eyes = [];
+  for (const sx of [-1, 1]) {
+    const eye = makeEye(HR, sp.iris, sp.pupil);
+    eye.position.set(sx * HR * 0.39, HR * 0.1, HR * 0.82);
+    eye.rotation.y = sx * 0.22;
+    head.add(eye);
+    eyes.push(eye);
+  }
+
+  const ears = [];
+
+  if (kind === 'cat') {
+    /* 立耳 + 内耳 */
+    for (const sx of [-1, 1]) {
+      const ear = new THREE.Group();
+      const outer = new THREE.Mesh(new THREE.ConeGeometry(HR * 0.4, HR * 0.74, 12), furMat);
+      outer.castShadow = true;
+      ear.add(outer);
+      const inner = new THREE.Mesh(new THREE.ConeGeometry(HR * 0.22, HR * 0.5, 10), innerMat);
+      inner.position.set(0, -HR * 0.06, HR * 0.08);
+      inner.scale.z = 0.45;
+      ear.add(inner);
+      ear.position.set(sx * HR * 0.6, HR * 0.72, -0.01);
+      ear.rotation.z = -sx * 0.24;
+      ear.rotation.x = -0.12;
+      head.add(ear);
+      ears.push(ear);
+    }
+    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(HR * 0.62, HR * 0.34, HR * 0.34), furMat);
+    muzzle.position.set(0, -HR * 0.24, HR * 0.94);
+    head.add(muzzle);
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.075, 8, 8), noseMat);
+    nose.position.set(0, -HR * 0.16, HR * 1.1);
+    nose.scale.set(1.25, 0.8, 0.7);
+    head.add(nose);
+    /* 腮边小绒毛 */
+    for (const sx of [-1, 1]) {
+      for (let i = 0; i < 2; i++) {
+        const tuft = new THREE.Mesh(new THREE.ConeGeometry(HR * 0.09, HR * 0.22, 6), furMat);
+        tuft.position.set(sx * HR * 0.78, -HR * (0.28 + i * 0.16), HR * 0.55);
+        tuft.rotation.z = -sx * 1.35;
+        tuft.rotation.x = 0.2;
+        head.add(tuft);
+      }
+    }
+  } else if (kind === 'dog') {
+    /* 垂耳：往下垂、往外撇，正面才看得出是狗 */
+    const earMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(furColor).multiplyScalar(0.82), roughness: 0.9
+    });
+    for (const sx of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.4, 12, 12), earMat);
+      ear.scale.set(0.6, 1.15, 0.42);
+      ear.position.set(sx * HR * 0.98, -HR * 0.3, -0.01);
+      ear.rotation.z = -sx * 0.3;
+      ear.castShadow = true;
+      head.add(ear);
+      ears.push(ear);
+    }
+    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(HR * 0.6, HR * 0.44, HR * 0.62), furMat);
+    muzzle.position.set(0, -HR * 0.3, HR * 0.98);
+    muzzle.castShadow = true;
+    head.add(muzzle);
+    const snoutTip = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.29, 10, 10), furMat);
+    snoutTip.position.set(0, -HR * 0.3, HR * 1.24);
+    snoutTip.scale.set(1.05, 0.88, 0.9);
+    head.add(snoutTip);
+    const jaw = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.3, 10, 10), furMat);
+    jaw.position.set(0, -HR * 0.52, HR * 0.86);
+    jaw.scale.set(1.1, 0.7, 1.0);
+    head.add(jaw);
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.14, 10, 10), noseMat);
+    nose.position.set(0, -HR * 0.24, HR * 1.54);
+    nose.scale.set(1.15, 0.92, 0.85);
+    head.add(nose);
+    /* 眉毛点 */
+    for (const sx of [-1, 1]) {
+      const brow = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.07, 8, 8), darkMat);
+      brow.position.set(sx * HR * 0.44, HR * 0.44, HR * 0.74);
+      brow.scale.set(1.3, 0.5, 0.6);
+      head.add(brow);
+    }
+  } else if (kind === 'pig') {
+    for (const sx of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(HR * 0.34, HR * 0.42, 4), darkMat);
+      ear.position.set(sx * HR * 0.6, HR * 0.72, -0.01);
+      ear.rotation.z = -sx * 0.95;
+      ear.rotation.x = -0.4;
+      ear.scale.z = 0.6;
+      head.add(ear);
+      ears.push(ear);
+    }
+    const snout = new THREE.Mesh(new THREE.CylinderGeometry(HR * 0.4, HR * 0.36, HR * 0.3, 16), innerMat);
+    snout.rotation.x = Math.PI / 2;
+    snout.position.set(0, -HR * 0.18, HR * 1.02);
+    head.add(snout);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(HR * 0.4, HR * 0.045, 8, 18), innerMat);
+    rim.position.set(0, -HR * 0.18, HR * 1.17);
+    head.add(rim);
+    for (const sx of [-1, 1]) {
+      const hole = new THREE.Mesh(new THREE.CylinderGeometry(HR * 0.06, HR * 0.06, HR * 0.05, 8), noseMat);
+      hole.rotation.x = Math.PI / 2;
+      hole.position.set(sx * HR * 0.13, -HR * 0.18, HR * 1.19);
+      head.add(hole);
+      const jowl = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.34, 10, 10), furMat);
+      jowl.position.set(sx * HR * 0.48, -HR * 0.4, HR * 0.52);
+      head.add(jowl);
+    }
+  } else if (kind === 'cow') {
+    for (const sx of [-1, 1]) {
+      /* 角：沿曲线长出来的管 */
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(sx * HR * 0.52, HR * 0.56, 0),
+        new THREE.Vector3(sx * HR * 0.86, HR * 0.78, 0.03),
+        new THREE.Vector3(sx * HR * 0.94, HR * 0.98, 0.12),
+        new THREE.Vector3(sx * HR * 0.8, HR * 1.06, 0.22)
+      ]);
+      const hornMatC = new THREE.MeshStandardMaterial({ color: 0xd8ccb6, roughness: 0.55, side: THREE.DoubleSide });
+      const horn = new THREE.Mesh(taperedTube(curve, HR * 0.078, HR * 0.026, 12, 8), hornMatC);
+      horn.castShadow = true;
+      head.add(horn);
+      const hornTip = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.028, 8, 8),
+        new THREE.MeshStandardMaterial({ color: 0xd3c7b1, roughness: 0.5 }));
+      hornTip.position.copy(curve.getPointAt(1));
+      head.add(hornTip);
+      /* 耳朵 */
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.28, 10, 10), furMat);
+      ear.scale.set(1.6, 0.45, 0.8);
+      ear.position.set(sx * HR * 0.9, HR * 0.14, -0.03);
+      ear.rotation.z = -sx * 0.42;
+      ear.castShadow = true;
+      head.add(ear);
+      ears.push(ear);
+    }
+    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(HR * 0.78, HR * 0.52, HR * 0.44),
+      new THREE.MeshStandardMaterial({ color: 0xd3aca2, roughness: 0.62 }));
+    muzzle.position.set(0, -HR * 0.34, HR * 0.94);
+    muzzle.castShadow = true;
+    head.add(muzzle);
+    const chin = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.26, 10, 10),
+      new THREE.MeshStandardMaterial({ color: 0xcfa89e, roughness: 0.62 }));
+    chin.position.set(0, -HR * 0.56, HR * 0.82);
+    chin.scale.set(1.2, 0.6, 1.0);
+    head.add(chin);
+    for (const sx of [-1, 1]) {
+      const hole = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.05, 8, 8), noseMat);
+      hole.position.set(sx * HR * 0.19, -HR * 0.28, HR * 1.16);
+      hole.scale.set(0.8, 1.2, 0.5);
+      head.add(hole);
+    }
+  } else {
+    /* 山羊：长脸、横瞳、山羊胡、往后弯的角 */
+    skull.scale.set(0.96, 0.92, 1.14); /* 头不是正圆，往前拉一点 */
+    const hornMat = new THREE.MeshStandardMaterial({ color: 0x4a3f33, roughness: 0.52, metalness: 0.15 });
+    for (const sx of [-1, 1]) {
+      /* 角：一串递减的球沿曲线排，天然带锥度 */
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(sx * HR * 0.34, HR * 0.66, -0.03),
+        new THREE.Vector3(sx * HR * 0.46, HR * 0.96, -0.16),
+        new THREE.Vector3(sx * HR * 0.42, HR * 1.12, -0.38),
+        new THREE.Vector3(sx * HR * 0.26, HR * 1.14, -0.56)
+      ]);
+      const geo = taperedTube(curve, HR * 0.12, HR * 0.038, 14, 8);
+      const horn = new THREE.Mesh(geo, hornMat);
+      horn.material.side = THREE.DoubleSide;
+      horn.castShadow = true;
+      head.add(horn);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.04, 7, 7), hornMat);
+      tip.position.copy(curve.getPointAt(1));
+      head.add(tip);
+      /* 耳朵：长条往下耷 */
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.27, 10, 10), furMat);
+      ear.scale.set(1.95, 0.42, 0.78);
+      ear.position.set(sx * HR * 1.0, -HR * 0.12, 0.02);
+      ear.rotation.z = -sx * 0.66;
+      ear.castShadow = true;
+      head.add(ear);
+      ears.push(ear);
+    }
+    /* 长脸 */
+    const muzzle = new THREE.Mesh(new THREE.BoxGeometry(HR * 0.5, HR * 0.42, HR * 0.5), furMat);
+    muzzle.position.set(0, -HR * 0.34, HR * 0.96);
+    muzzle.castShadow = true;
+    head.add(muzzle);
+    const snoutTip = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.255, 10, 10), furMat);
+    snoutTip.position.set(0, -HR * 0.37, HR * 1.18);
+    snoutTip.scale.set(1.0, 0.86, 0.95);
+    head.add(snoutTip);
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.095, 8, 8), noseMat);
+    nose.position.set(0, -HR * 0.4, HR * 1.38);
+    nose.scale.set(1.2, 0.85, 0.7);
+    head.add(nose);
+    /* 山羊胡 */
+    const beardMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(furColor).multiplyScalar(0.62), roughness: 1, flatShading: true
+    });
+    const beard = new THREE.Mesh(new THREE.ConeGeometry(HR * 0.19, HR * 0.85, 8), beardMat);
+    beard.position.set(0, -HR * 1.02, HR * 0.94);
+    beard.rotation.x = Math.PI;
+    beard.castShadow = true;
+    head.add(beard);
+    const chinTuft = new THREE.Mesh(new THREE.SphereGeometry(HR * 0.15, 8, 8), beardMat);
+    chinTuft.position.set(0, -HR * 0.7, HR * 0.98);
+    head.add(chinTuft);
+  }
+
+  /* ---- 尾巴 ---- */
+  const tailPivot = new THREE.Group();
+  tailPivot.position.set(0, 0.02 + bodyH * 0.42, -R * 0.94);
+  g.add(tailPivot);
+  let tail = null;
+
+  if (kind === 'cat') {
+    /* 一节一节的环纹尾巴 */
+    const segs = 7;
+    for (let i = 0; i < segs; i++) {
+      const t = i / (segs - 1);
+      const seg = new THREE.Mesh(
+        new THREE.SphereGeometry(R * (0.14 - t * 0.055), 8, 8),
+        i % 2 ? darkMat : furMat
+      );
+      seg.position.set(0, t * R * 1.5, -t * t * R * 0.75);
+      seg.castShadow = true;
+      tailPivot.add(seg);
+      tail = seg;
+    }
+  } else if (kind === 'dog') {
+    const t = new THREE.Mesh(new THREE.CapsuleGeometry(R * 0.15, R * 0.7, 5, 8), furMat);
+    t.position.set(0, R * 0.42, -R * 0.26);
+    t.rotation.x = -0.72;
+    t.castShadow = true;
+    tailPivot.add(t);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(R * 0.15, 8, 8), furMat);
+    tip.position.set(0, R * 0.78, -R * 0.26);
+    tailPivot.add(tip);
+    tail = t;
+  } else if (kind === 'pig') {
+    const t = new THREE.Mesh(new THREE.TorusGeometry(R * 0.22, R * 0.05, 6, 16, Math.PI * 1.8), darkMat);
+    t.position.set(0, R * 0.1, -R * 0.08);
+    t.rotation.y = Math.PI / 2;
+    tailPivot.add(t);
+    tail = t;
+  } else if (kind === 'cow') {
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.04, R * 0.065, R * 1.6, 7), darkMat);
+    t.position.set(0, -R * 0.75, -R * 0.05);
+    t.castShadow = true;
+    tailPivot.add(t);
+    const tuft = new THREE.Mesh(new THREE.SphereGeometry(R * 0.17, 8, 8), darkMat);
+    tuft.position.set(0, -R * 1.6, -R * 0.05);
+    tuft.scale.set(1, 1.5, 1);
+    tailPivot.add(tuft);
+    tail = t;
+  } else {
+    /* 山羊：短而翘的小尾巴 */
+    const t = new THREE.Mesh(new THREE.ConeGeometry(R * 0.15, R * 0.5, 8), furMat);
+    t.position.set(0, R * 0.38, -R * 0.1);
+    t.rotation.x = 0.55;
+    t.castShadow = true;
+    tailPivot.add(t);
+    tail = t;
+  }
+
+  /* ---- 附加细节 ---- */
+  if (kind === 'goat') {
+    /* 脖子上的皮项圈 */
+    const strapMat = new THREE.MeshStandardMaterial({ color: 0x6b4526, roughness: 0.9 });
+    const strap = new THREE.Mesh(new THREE.TorusGeometry(R * 0.5, R * 0.06, 8, 18), strapMat);
+    strap.position.set(0, topY - HR * 0.12, 0.02);
+    strap.rotation.x = Math.PI / 2;
+    g.add(strap);
+  }
+
+  if (kind === 'cow' && sp.bell) {
+    /* 牛铃 */
+    const strapMat = new THREE.MeshStandardMaterial({ color: 0x5a2f1e, roughness: 0.9 });
+    const strap = new THREE.Mesh(new THREE.TorusGeometry(R * 0.56, R * 0.05, 8, 20), strapMat);
+    strap.position.set(0, topY - HR * 0.1, 0.01);
+    strap.rotation.x = Math.PI / 2;
+    g.add(strap);
+    const brass = new THREE.MeshStandardMaterial({ color: 0xc9922f, roughness: 0.35, metalness: 0.75 });
+    const bell = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.16, R * 0.23, R * 0.3, 10, 1, true), brass);
+    bell.position.set(0, topY - HR * 0.42, HR * 0.72);
+    bell.castShadow = true;
+    g.add(bell);
+    const clapper = new THREE.Mesh(new THREE.SphereGeometry(R * 0.06, 8, 8), noseMat);
+    clapper.position.set(0, topY - HR * 0.56, HR * 0.72);
+    g.add(clapper);
+  }
+
+  if (kind === 'dog' && sp.collar) {
+    const collarMat = new THREE.MeshStandardMaterial({ color: 0x8c3b2c, roughness: 0.75 });
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(R * 0.5, R * 0.055, 8, 22), collarMat);
+    collar.position.set(0, topY - HR * 0.18, 0.02);
+    collar.rotation.x = Math.PI / 2;
+    g.add(collar);
+    const tag = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.075, R * 0.075, R * 0.03, 10),
+      new THREE.MeshStandardMaterial({ color: 0xd9b25c, roughness: 0.4, metalness: 0.7 }));
+    tag.position.set(0, topY - HR * 0.28, HR * 0.5);
+    tag.rotation.x = Math.PI / 2;
+    g.add(tag);
+  }
+
+  if (kind === 'pig') {
+    /* 圆肚子 */
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(R * 0.78, 16, 12), furMat);
+    belly.position.set(0, 0.02 + bodyH * 0.36, R * 0.16);
+    belly.scale.set(1.0, 0.82, 0.7);
+    belly.castShadow = true;
+    g.add(belly);
+  }
+
+  g.scale.setScalar(sp.scale);
+  g.userData.kind = kind;
+  return { group: g, torso, head, headY, ears, eyes, tail, tailPivot, spec: sp };
+}
+
+/* ================= 座位 ================= */
+const SEATS = [
+  { key: 'S', pos: new THREE.Vector3(0, SEAT_Y, 1.02), rotY: Math.PI, label: '你' },
+  { key: 'W', pos: new THREE.Vector3(-1.30, SEAT_Y, -0.04), rotY: Math.PI / 2, label: '左手边' },
+  { key: 'N', pos: new THREE.Vector3(0, SEAT_Y, -1.02), rotY: 0, label: '对家' },
+  { key: 'E', pos: new THREE.Vector3(1.30, SEAT_Y, -0.04), rotY: -Math.PI / 2, label: '右手边' }
+];
+
+let animals = [];
+
+function spawnSeats(seed) {
+  for (const a of animals) {
+    scene.remove(a.group);
+    a.group.traverse(o => { if (o.isMesh) o.geometry?.dispose?.(); });
+  }
+  animals = [];
+
+  const rng = mulberry(seed);
+  const kinds = ['cat', 'dog', 'pig', 'cow', 'goat'];
+  /* 五个物种里抽四个，不重复，留一个在家看门 */
+  for (let i = kinds.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [kinds[i], kinds[j]] = [kinds[j], kinds[i]];
+  }
+  let chosen = kinds.slice(0, 4);
+  /* 调试用：?kinds=cow,dog,pig,goat 按 南/西/北/东 指定 */
+  const forced = new URLSearchParams(location.search).get('kinds');
+  if (forced) {
+    const list = forced.split(',').map(s => s.trim()).filter(k => SPECIES[k]);
+    if (list.length === 4) chosen = list;
+  }
+
+  SEATS.forEach((seat, i) => {
+    const kind = chosen[i];
+    const a = buildAnimal(kind, rng);
+    a.group.position.copy(seat.pos);
+    a.group.rotation.y = seat.rotY;
+    a.kind = kind;
+    a.name = pick(rng, NAMES[kind]);
+    a.seat = seat;
+    a.phase = rng() * 6.283;
+    a.t = 0;
+    a.blinkAt = 1 + rng() * 5;
+    a.blink = 0;
+    a.idleSpeed = 0.85 + rng() * 0.4;
+    /* 自己那一席就是镜头所在，第 2 步会换成“自己的双手 / 手牌” */
+    a.self = seat.key === 'S';
+    a.group.visible = !a.self;
+    scene.add(a.group);
+    animals.push(a);
+  });
+
+  renderRoster();
+}
+
+function renderRoster() {
+  const el = document.getElementById('roster');
+  el.innerHTML = animals.map(a => {
+    const me = a.seat.key === 'S';
+    return '<div class="chip' + (me ? ' me' : '') + '">'
+      + '<span class="em">' + SPECIES[a.kind].emoji + '</span>'
+      + '<b>' + a.name + '</b>'
+      + '<i>' + (me ? '你（镜头所在）' : SPECIES[a.kind].cn + ' · ' + a.seat.label) + '</i>'
+      + '</div>';
+  }).join('');
+}
+
+/* ================= 动作（呼吸 / 眨眼 / 尾巴） ================= */
+function idleAnimals(dt, now) {
+  for (const a of animals) {
+    a.t += dt;
+    const t = a.t * a.idleSpeed + a.phase;
+
+    /* 呼吸 */
+    a.torso.scale.y = 1 + Math.sin(t * 1.7) * 0.016;
+
+    /* 头部微动 */
+    a.head.rotation.x = 0.1 + Math.sin(t * 1.15) * 0.045;
+    a.head.rotation.y = Math.sin(t * 0.37) * 0.17;
+    a.head.position.y = a.headY + Math.sin(t * 1.7 + 1.2) * 0.006;
+
+    /* 眨眼 */
+    a.blinkAt -= dt;
+    if (a.blinkAt <= 0) { a.blink = 1; a.blinkAt = 2.5 + Math.random() * 5.5; }
+    if (a.blink > 0) {
+      a.blink = Math.max(0, a.blink - dt * 7);
+      const s = 0.12 + Math.abs(Math.cos(a.blink * Math.PI)) * 0.88;
+      for (const e of a.eyes) e.scale.y = s;
+    }
+
+    /* 物种小动作 */
+    if (a.kind === 'dog') {
+      a.tailPivot.rotation.y = Math.sin(t * 7.5) * 0.55;
+    } else if (a.kind === 'cat') {
+      a.tailPivot.rotation.z = Math.sin(t * 1.35) * 0.3;
+      a.tailPivot.rotation.x = Math.sin(t * 0.9 + 1) * 0.12;
+    } else if (a.kind === 'pig') {
+      a.head.rotation.x += Math.sin(t * 0.55) * 0.05;
+    } else if (a.kind === 'cow') {
+      a.head.rotation.z = Math.sin(t * 0.65) * 0.05;
+    } else if (a.kind === 'goat') {
+      a.head.rotation.z = Math.sin(t * 0.9) * 0.06;
+      a.head.rotation.x += Math.max(0, Math.sin(t * 2.3)) * 0.03;
+    }
+
+    /* 偶尔抖一下耳朵 */
+    const twitch = Math.sin(t * 0.7 + a.phase * 3);
+    if (a.ears.length) {
+      a.ears.forEach((ear, idx) => {
+        ear.rotation.x = (idx ? 1 : -1) * Math.max(0, twitch - 0.93) * 2.2;
+      });
+    }
+  }
+}
+
+/* ================= 煤油灯晃动 / 萤火虫 ================= */
+const fireflies = [];
+{
+  const n = IS_SMALL ? 26 : 48;
+  const geo = new THREE.SphereGeometry(0.018, 6, 6);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xffe07a });
+  const rng = mulberry(4242);
+  for (let i = 0; i < n; i++) {
+    const f = new THREE.Mesh(geo, mat);
+    const a = rng() * 6.283, r = 2 + rng() * 5;
+    f.position.set(Math.cos(a) * r, 0.6 + rng() * 1.6, Math.sin(a) * r);
+    f.userData = { base: f.position.clone(), sp: 0.2 + rng() * 0.5, ph: rng() * 6.283, amp: 0.3 + rng() * 0.7 };
+    scene.add(f);
+    fireflies.push(f);
+  }
+}
+
+function updateAtmosphere(dt, now) {
+  const s = now * 0.001;
+  if (lanternRig.group) {
+    lanternRig.group.rotation.z = Math.sin(s * 0.62) * 0.055 + Math.sin(s * 1.7) * 0.012;
+    lanternRig.group.rotation.x = Math.sin(s * 0.48 + 1.1) * 0.045;
+    const flicker = 0.82 + Math.sin(s * 7.3) * 0.06 + Math.sin(s * 17.1) * 0.04 + Math.sin(s * 3.1) * 0.05;
+    lanternRig.light.intensity = 6.0 * flicker;
+  }
+  for (const f of fireflies) {
+    const u = f.userData;
+    f.position.y = u.base.y + Math.sin(s * u.sp * 2 + u.ph) * 0.35;
+    f.position.x = u.base.x + Math.cos(s * u.sp + u.ph) * u.amp;
+    f.position.z = u.base.z + Math.sin(s * u.sp * 0.8 + u.ph * 1.7) * u.amp;
+    f.visible = (Math.sin(s * 1.6 + u.ph * 2) + 1) > 0.35;
+  }
+
+  /* 蛾子绕灯、薄雾飘、浮尘慢慢往上 */
+  if (lanternRig.lamp) {
+    lanternRig.lamp.getWorldPosition(_v1);
+    for (const m of moths) {
+      const u = m.userData;
+      const a = s * u.sp + u.ph;
+      m.position.set(
+        _v1.x + Math.cos(a) * u.r,
+        _v1.y + 0.04 + Math.sin(s * 2.3 + u.ph) * u.y,
+        _v1.z + Math.sin(a) * u.r
+      );
+    }
+  }
+  for (const h of hazeSprites) {
+    const u = h.userData;
+    h.position.x = u.base.x + Math.sin(s * u.sp + u.ph) * 0.5;
+    h.position.z = u.base.z + Math.cos(s * u.sp * 0.8 + u.ph) * 0.5;
+    h.material.opacity = 0.045 + Math.abs(Math.sin(s * u.sp * 1.7 + u.ph)) * 0.05;
+  }
+  if (dustPoints) {
+    const arr = dustPoints.geometry.attributes.position.array;
+    for (let i = 0; i < arr.length; i += 3) {
+      arr[i + 1] += dt * 0.035;
+      if (arr[i + 1] > 2.2) arr[i + 1] = 0.6;
+      arr[i] += Math.sin(s * 0.7 + i) * 0.0006;
+    }
+    dustPoints.geometry.attributes.position.needsUpdate = true;
+  }
+}
+
+/* ================= 牌：牌面绘制 ================= */
+const CARD_RANKS = {
+  wheat: { cn: '小麦', tint: '#d8b45a' },
+  corn: { cn: '玉米', tint: '#e2b53c' },
+  pumpkin: { cn: '南瓜', tint: '#e0873a' },
+  joker: { cn: '稻草人', tint: '#9c8a5e' },
+  crown: { cn: '皇冠', tint: '#d9b23c' }
+};
+const RANK_ORDER = ['wheat', 'corn', 'pumpkin'];
+const DECK_PLAN = [['wheat', 6], ['corn', 6], ['pumpkin', 6], ['joker', 2], ['crown', 2]];
+
+function canvasTexWH(w, h, draw) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  draw(g, w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return t;
+}
+
+function iconWheat(g, s) {
+  g.strokeStyle = '#a5813c'; g.lineWidth = s * 0.05;
+  g.beginPath(); g.moveTo(0, s * 0.5); g.lineTo(0, -s * 0.3); g.stroke();
+  g.fillStyle = '#d9a441';
+  g.beginPath(); g.ellipse(0, -s * 0.42, s * 0.085, s * 0.15, 0, 0, 6.283); g.fill();
+  for (let i = 0; i < 6; i++) {
+    const y = -s * 0.28 + i * s * 0.12;
+    for (const sx of [-1, 1]) {
+      g.beginPath();
+      g.ellipse(sx * s * 0.12, y, s * 0.08, s * 0.145, sx * 0.55, 0, 6.283);
+      g.fill();
+    }
+  }
+}
+function iconCorn(g, s) {
+  g.fillStyle = '#7f9a4a';
+  for (const sx of [-1, 1]) {
+    g.beginPath();
+    g.moveTo(0, s * 0.45);
+    g.quadraticCurveTo(sx * s * 0.44, s * 0.1, sx * s * 0.18, -s * 0.42);
+    g.quadraticCurveTo(sx * s * 0.04, 0, 0, s * 0.45);
+    g.fill();
+  }
+  g.fillStyle = '#e2b53c';
+  g.beginPath(); g.ellipse(0, 0, s * 0.17, s * 0.35, 0, 0, 6.283); g.fill();
+  g.fillStyle = 'rgba(168,120,26,.5)';
+  for (let r = 0; r < 6; r++) {
+    for (let c = -1; c <= 1; c++) {
+      g.beginPath();
+      g.arc(c * s * 0.09, -s * 0.24 + r * s * 0.095, s * 0.031, 0, 6.283);
+      g.fill();
+    }
+  }
+}
+function iconPumpkin(g, s) {
+  g.fillStyle = '#d9802e';
+  for (const k of [-1, 0, 1]) {
+    g.beginPath();
+    g.ellipse(k * s * 0.13, s * 0.03, s * 0.19, s * 0.26, 0, 0, 6.283);
+    g.fill();
+  }
+  g.fillStyle = 'rgba(120,60,10,.25)';
+  for (const k of [-1, 1]) {
+    g.beginPath();
+    g.ellipse(k * s * 0.13, s * 0.03, s * 0.03, s * 0.25, 0, 0, 6.283);
+    g.fill();
+  }
+  g.fillStyle = '#6f5a2a';
+  g.beginPath(); g.roundRect(-s * 0.045, -s * 0.36, s * 0.09, s * 0.13, s * 0.03); g.fill();
+}
+function iconScarecrow(g, s) {
+  g.strokeStyle = '#8a6a3a'; g.lineWidth = s * 0.06;
+  g.beginPath(); g.moveTo(0, -s * 0.42); g.lineTo(0, s * 0.44); g.stroke();
+  g.beginPath(); g.moveTo(-s * 0.36, -s * 0.12); g.lineTo(s * 0.36, -s * 0.12); g.stroke();
+  g.fillStyle = '#c9ab6d';
+  g.beginPath(); g.arc(0, -s * 0.26, s * 0.15, 0, 6.283); g.fill();
+  g.fillStyle = '#3a2a18';
+  g.beginPath(); g.arc(-s * 0.055, -s * 0.29, s * 0.024, 0, 6.283); g.fill();
+  g.beginPath(); g.arc(s * 0.055, -s * 0.29, s * 0.024, 0, 6.283); g.fill();
+  g.fillStyle = '#6b4a2a';
+  g.beginPath(); g.ellipse(0, -s * 0.37, s * 0.21, s * 0.05, 0, 0, 6.283); g.fill();
+  g.fillRect(-s * 0.11, -s * 0.46, s * 0.22, s * 0.09);
+}
+function iconCrown(g, s) {
+  g.fillStyle = '#e8c04a';
+  g.beginPath();
+  g.moveTo(-s * 0.34, s * 0.14);
+  g.lineTo(-s * 0.34, -s * 0.2);
+  g.lineTo(-s * 0.14, s * 0.0);
+  g.lineTo(0, -s * 0.32);
+  g.lineTo(s * 0.14, s * 0.0);
+  g.lineTo(s * 0.34, -s * 0.2);
+  g.lineTo(s * 0.34, s * 0.14);
+  g.closePath();
+  g.fill();
+  g.fillStyle = '#b8912e';
+  g.fillRect(-s * 0.34, s * 0.14, s * 0.68, s * 0.11);
+  g.fillStyle = '#c0392b';
+  g.beginPath(); g.arc(0, s * 0.195, s * 0.048, 0, 6.283); g.fill();
+  g.fillStyle = '#4a7fc1';
+  g.beginPath(); g.arc(-s * 0.21, s * 0.195, s * 0.036, 0, 6.283); g.fill();
+  g.beginPath(); g.arc(s * 0.21, s * 0.195, s * 0.036, 0, 6.283); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.35)';
+  g.beginPath(); g.arc(-s * 0.3, -s * 0.18, s * 0.04, 0, 6.283); g.fill();
+}
+const RANK_ICONS = { wheat: iconWheat, corn: iconCorn, pumpkin: iconPumpkin, joker: iconScarecrow, crown: iconCrown };
+
+function drawCardFace(g, W, H, rank) {
+  g.fillStyle = '#f4ebd8';
+  g.fillRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(110,82,44,.5)';
+  g.lineWidth = 7;
+  g.strokeRect(9, 9, W - 18, H - 18);
+  g.fillStyle = CARD_RANKS[rank].tint;
+  g.fillRect(12, 12, W - 24, 58);
+  g.fillStyle = '#33230f';
+  g.font = '700 34px "PingFang SC","Microsoft YaHei",sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(CARD_RANKS[rank].cn, W / 2, 43);
+  g.save();
+  g.translate(W / 2, H / 2 + 34);
+  RANK_ICONS[rank](g, 150);
+  g.restore();
+  g.fillStyle = 'rgba(80,58,30,.5)';
+  g.font = '600 22px "PingFang SC",sans-serif';
+  g.fillText(CARD_RANKS[rank].cn, W / 2, H - 32);
+}
+
+const cardFaceMats = {};
+for (const k of Object.keys(CARD_RANKS)) {
+  cardFaceMats[k] = new THREE.MeshStandardMaterial({
+    map: canvasTexWH(256, 360, (g, W, H) => drawCardFace(g, W, H, k)),
+    roughness: 0.85
+  });
+}
+const handBackTex = canvasTexWH(256, 360, (g, W, H) => {
+  g.fillStyle = '#7d2a24';
+  g.fillRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(255,226,180,.5)';
+  g.lineWidth = 6;
+  g.strokeRect(12, 12, W - 24, H - 24);
+  g.lineWidth = 3;
+  for (let i = -4; i < 10; i++) {
+    g.beginPath(); g.moveTo(i * 40, 0); g.lineTo(i * 40 + H, H); g.stroke();
+    g.beginPath(); g.moveTo(i * 40, H); g.lineTo(i * 40 + H, 0); g.stroke();
+  }
+  g.fillStyle = 'rgba(20,12,8,.55)';
+  g.beginPath(); g.arc(W / 2, H / 2, 54, 0, 6.283); g.fill();
+  g.strokeStyle = 'rgba(255,226,180,.7)';
+  g.lineWidth = 4;
+  g.beginPath(); g.arc(W / 2, H / 2, 54, 0, 6.283); g.stroke();
+});
+const cardBackMat = new THREE.MeshStandardMaterial({ map: handBackTex, roughness: 0.82 });
+const cardEdgeMat = new THREE.MeshStandardMaterial({ color: 0xe9e0ca, roughness: 0.9 });
+const cardGeo = new THREE.BoxGeometry(0.09, 0.005, 0.13);
+
+function cardMesh(rank, faceUp) {
+  const face = cardFaceMats[rank] || cardFaceMats.joker;
+  const mats = faceUp
+    ? [cardEdgeMat, cardEdgeMat, face, cardBackMat, cardEdgeMat, cardEdgeMat]
+    : [cardEdgeMat, cardEdgeMat, cardBackMat, face, cardEdgeMat, cardEdgeMat];
+  const m = new THREE.Mesh(cardGeo, mats);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  return m;
+}
+
+/* ================= 枪 ================= */
+function makeGun() {
+  const group = new THREE.Group();
+  const steel = new THREE.MeshStandardMaterial({ color: 0x6a6056, roughness: 0.5, metalness: 0.72 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x3a352f, roughness: 0.45, metalness: 0.8 });
+  const wood = new THREE.MeshStandardMaterial({ color: 0x8d5c33, roughness: 0.65 });
+
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.018, 0.21, 14), steel);
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.set(0, 0.014, 0.115);
+  group.add(barrel);
+  const sight = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.011, 0.011), dark);
+  sight.position.set(0, 0.036, 0.208);
+  group.add(sight);
+  const ejector = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.17, 8), dark);
+  ejector.rotation.x = Math.PI / 2;
+  ejector.position.set(0, -0.012, 0.09);
+  group.add(ejector);
+
+  const drumPivot = new THREE.Group();
+  drumPivot.position.set(0, 0.014, -0.012);
+  drumPivot.rotation.x = Math.PI / 2;
+  group.add(drumPivot);
+  const cylinder = new THREE.Group();
+  drumPivot.add(cylinder);
+
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.043, 0.043, 0.078, 18), steel);
+  cylinder.add(drum);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const hole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.0082, 0.0082, 0.082, 8),
+      new THREE.MeshStandardMaterial({ color: 0x0d0c0b, roughness: 0.95 })
+    );
+    hole.position.set(Math.cos(a) * 0.026, 0, Math.sin(a) * 0.026);
+    cylinder.add(hole);
+  }
+
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.052, 0.1), steel);
+  frame.position.set(0, 0.006, -0.078);
+  group.add(frame);
+  const hammer = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.028, 0.016), dark);
+  hammer.position.set(0, 0.042, -0.12);
+  hammer.rotation.x = -0.45;
+  group.add(hammer);
+
+  const guard = new THREE.Mesh(new THREE.TorusGeometry(0.027, 0.0045, 6, 16, Math.PI * 1.15), steel);
+  guard.position.set(0, -0.014, -0.048);
+  guard.rotation.set(0, Math.PI / 2, 0);
+  group.add(guard);
+  const trigger = new THREE.Mesh(new THREE.BoxGeometry(0.007, 0.019, 0.008), dark);
+  trigger.position.set(0, -0.02, -0.05);
+  group.add(trigger);
+
+  const gripGrp = new THREE.Group();
+  gripGrp.position.set(0, -0.008, -0.088);
+  gripGrp.rotation.x = -0.34;
+  group.add(gripGrp);
+  const grip = new THREE.Mesh(new THREE.CapsuleGeometry(0.027, 0.07, 5, 12), wood);
+  grip.position.set(0, -0.052, 0);
+  grip.scale.set(1.06, 1, 0.76);
+  gripGrp.add(grip);
+  const butt = new THREE.Mesh(new THREE.CylinderGeometry(0.029, 0.025, 0.014, 12), dark);
+  butt.position.set(0, -0.11, 0);
+  gripGrp.add(butt);
+
+  group.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  return { group, cylinder, hammer, trigger };
+}
+
+/* ================= 声音（全部合成，无素材） ================= */
+const Audio2 = (() => {
+  let ctx = null;
+  const ac = () => {
+    if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ctx = null; } }
+    if (ctx && ctx.state === 'suspended') { try { ctx.resume(); } catch (e) {} }
+    return ctx;
+  };
+  function noise(dur, freq, gain, type, q) {
+    const c = ac(); if (!c) return;
+    const n = Math.floor(c.sampleRate * dur);
+    const buf = c.createBuffer(1, n, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2.4);
+    const src = c.createBufferSource(); src.buffer = buf;
+    const f = c.createBiquadFilter(); f.type = type || 'bandpass'; f.frequency.value = freq; f.Q.value = q || 1.2;
+    const g = c.createGain(); g.gain.value = gain;
+    src.connect(f); f.connect(g); g.connect(c.destination);
+    src.start();
+  }
+  function tone(freq, dur, gain, type, slideTo, delay) {
+    const c = ac(); if (!c) return;
+    const t0 = c.currentTime + (delay || 0);
+    const o = c.createOscillator(); const g = c.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t0 + dur);
+    g.gain.setValueAtTime(gain, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(t0); o.stop(t0 + dur + 0.02);
+  }
+  let ambientOn = false;
+  return {
+    unlock() { ac(); },
+    /* 夜里的底噪：风 + 蛐蛐 */
+    ambient() {
+      if (ambientOn) return;
+      const c = ac(); if (!c) return;
+      ambientOn = true;
+      const n = Math.floor(c.sampleRate * 4);
+      const buf = c.createBuffer(1, n, c.sampleRate);
+      const d = buf.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < n; i++) {
+        last = last * 0.86 + (Math.random() * 2 - 1) * 0.14;
+        d[i] = last * 3;
+      }
+      const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 340;
+      const g = c.createGain(); g.gain.value = 0.5;
+      src.connect(lp); lp.connect(g); g.connect(c.destination);
+      src.start();
+      const chirp = () => {
+        if (!ctx) return;
+        const t0 = ctx.currentTime;
+        const f = 3900 + Math.random() * 700;
+        for (let i = 0; i < 3; i++) {
+          const o = ctx.createOscillator(); const gg = ctx.createGain();
+          o.type = 'sine'; o.frequency.value = f;
+          gg.gain.setValueAtTime(0, t0 + i * 0.052);
+          gg.gain.linearRampToValueAtTime(0.02, t0 + i * 0.052 + 0.008);
+          gg.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.052 + 0.045);
+          o.connect(gg); gg.connect(ctx.destination);
+          o.start(t0 + i * 0.052); o.stop(t0 + i * 0.052 + 0.05);
+        }
+      };
+      setInterval(() => { if (Math.random() < 0.72) chirp(); }, 1500);
+    },
+    deal() { noise(0.09, 2600, 0.12, 'highpass'); },
+    play() { noise(0.11, 1800, 0.16, 'bandpass'); },
+    creak() {
+      tone(180 + Math.random() * 60, 0.5, 0.03, 'sawtooth', 120);
+      noise(0.5, 420, 0.05, 'bandpass', 3);
+    },
+    click() { tone(2100, 0.05, 0.16, 'square', 1200); noise(0.05, 3200, 0.1, 'highpass'); },
+    spin() { noise(0.4, 1200, 0.08, 'bandpass'); },
+    cock() { tone(1800, 0.04, 0.12, 'square'); tone(1400, 0.04, 0.12, 'square', 900, 0.09); },
+    heart() { tone(58, 0.18, 0.26, 'sine', 38); },
+    bang() {
+      noise(0.45, 320, 0.6, 'lowpass');
+      tone(95, 0.4, 0.42, 'sawtooth', 38);
+      noise(0.2, 2200, 0.18, 'highpass');
+    },
+    win() { tone(523, 0.16, 0.13, 'triangle'); tone(659, 0.16, 0.13, 'triangle', null, 0.13); tone(784, 0.3, 0.13, 'triangle', null, 0.26); },
+    lose() { tone(330, 0.24, 0.13, 'triangle', 180); tone(220, 0.42, 0.13, 'triangle', 110, 0.2); }
+  };
+})();
+
+/* ================= 补间 ================= */
+const PARAMS = new URLSearchParams(location.search);
+const FAST = PARAMS.has('fast');
+const SIM = PARAMS.has('sim');
+const tweens = [];
+function tween(obj, to, dur, ease) {
+  if (SIM) { for (const k in to) obj[k] = to[k]; return Promise.resolve(); }
+  return new Promise(res => {
+    const d = Math.max(0.01, dur * (FAST ? 0.08 : 1));
+    const tw = { obj, to, dur: d, t: 0, from: {}, ease: ease || (x => x), done: res };
+    for (const k in to) tw.from[k] = obj[k];
+    tweens.push(tw);
+  });
+}
+function updateTweens(dt) {
+  for (let i = tweens.length - 1; i >= 0; i--) {
+    const tw = tweens[i];
+    tw.t += dt;
+    const k = Math.min(1, tw.t / tw.dur);
+    const e = tw.ease(k);
+    for (const key in tw.to) tw.obj[key] = tw.from[key] + (tw.to[key] - tw.from[key]) * e;
+    if (k >= 1) { tweens.splice(i, 1); tw.done(); }
+  }
+}
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeInOut = x => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* ================= 牌局状态 ================= */
+const TABLE_TOP = 0.66;
+const PILE_POS = new THREE.Vector3(0, TABLE_TOP + 0.008, -0.02);
+
+const G = {
+  players: [],
+  target: 'wheat',
+  turn: 0,
+  pile: [],
+  lastClaim: null,
+  round: 0,
+  phase: 'boot',
+  auto: new URLSearchParams(location.search).has('auto'),
+  over: false,
+  humanResolve: null
+};
+const T = ms => SIM ? Promise.resolve() : sleep(FAST ? 1 : (G.auto ? Math.min(120, ms * 0.12) : ms));
+
+const handGroup = new THREE.Group();
+handGroup.position.set(0, -0.185, -0.78);
+const handLight = new THREE.PointLight(0xffe3bd, 1.15, 2.6, 2);
+handLight.position.set(0.1, 0.25, 0.35);
+camera.add(handLight);
+camera.add(handGroup);
+scene.add(camera);
+
+let handMeshes = [];
+const selected = new Set();
+
+/* ---------- 手牌布局 ---------- */
+function layoutHand() {
+  const n = handMeshes.length;
+  const span = Math.min(0.092 * n, 0.48);
+  handMeshes.forEach((item, i) => {
+    const t = n > 1 ? i / (n - 1) - 0.5 : 0;
+    const m = item.mesh;
+    const lifted = selected.has(item.card.id) ? 0.055 : 0;
+    m.position.set(t * span, lifted - Math.abs(t) * 0.02, -Math.abs(t) * 0.04);
+    m.rotation.set(Math.PI / 2 - 0.42, t * 0.06, -t * 0.2);
+  });
+  updatePlayButton();
+}
+
+function buildHand(p) {
+  handMeshes.forEach(it => handGroup.remove(it.mesh));
+  handMeshes = [];
+  selected.clear();
+  p.hand.forEach((card, i) => {
+    const m = cardMesh(card.rank, true);
+    m.scale.setScalar(1.0);
+    const item = { card, mesh: m };
+    m.userData.item = item;
+    handGroup.add(m);
+    handMeshes.push(item);
+  });
+  layoutHand();
+}
+
+/* ---------- 对家手里的牌背 ---------- */
+function setRivalCards(p, n) {
+  if (!p.cardsGroup) {
+    p.cardsGroup = new THREE.Group();
+    p.cardsGroup.position.set(0.3, 0.5, 0.16);
+    p.cardsGroup.rotation.set(-0.18, -0.55, 0.15);
+    p.animal.group.add(p.cardsGroup);
+  }
+  while (p.cardsGroup.children.length > n) p.cardsGroup.remove(p.cardsGroup.children[0]);
+  while (p.cardsGroup.children.length < n) {
+    const i = p.cardsGroup.children.length;
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.05, 0.074),
+      new THREE.MeshStandardMaterial({ map: handBackTex, roughness: 0.85, side: THREE.DoubleSide })
+    );
+    m.position.set((i - 2) * 0.028, (i % 2) * 0.004, i * 0.0012);
+    m.rotation.z = (i - 2) * 0.08;
+    m.castShadow = true;
+    p.cardsGroup.add(m);
+  }
+}
+
+/* ---------- 枪 摆位 ---------- */
+const GUN_SPOTS = {
+  S: { x: 0.52, z: 0.56, rot: 0.5 },
+  N: { x: -0.5, z: -0.54, rot: -2.5 },
+  W: { x: -0.84, z: 0.06, rot: 1.15 },
+  E: { x: 0.84, z: 0.06, rot: -1.15 }
+};
+
+function placeGuns() {
+  G.players.forEach(p => {
+    if (p.gunMesh) scene.remove(p.gunMesh.group);
+    const g = makeGun();
+    const spot = GUN_SPOTS[p.seat.key];
+    g.group.scale.setScalar(1.3);
+    g.group.rotation.set(0.02, spot.rot, Math.PI / 2);
+    g.group.position.set(spot.x, TABLE_TOP + 0.06, spot.z);
+    scene.add(g.group);
+    p.gunMesh = g;
+  });
+}
+
+/* ---------- HUD ---------- */
+const HUD = {
+  round: document.getElementById('roundNo'),
+  target: document.getElementById('targetName'),
+  rivals: document.getElementById('rivals'),
+  claim: document.getElementById('claim'),
+  acts: document.getElementById('acts'),
+  play: document.getElementById('btnPlay'),
+  challenge: document.getElementById('btnChallenge'),
+  banner: document.getElementById('banner'),
+  over: document.getElementById('over'),
+  overTitle: document.getElementById('overTitle'),
+  overText: document.getElementById('overText')
+};
+
+function updateHUD() {
+  HUD.round.textContent = G.round;
+  HUD.target.textContent = CARD_RANKS[G.target].cn;
+  HUD.rivals.innerHTML = G.players.filter(p => !p.human).map(p => {
+    const dots = Array.from({ length: 6 }, (_, i) => {
+      const spent = i < p.gun.count;
+      const danger = i === p.gun.count && p.gun.count === p.gun.pos - 1;
+      return '<span class="dot' + (spent ? ' spent' : '') + (danger ? ' near' : '') + '"></span>';
+    }).join('');
+    return '<div class="rival' + (p.alive ? '' : ' dead') + (G.players[G.turn] === p ? ' active' : '') + '">'
+      + '<span class="em">' + SPECIES[p.kind].emoji + '</span>'
+      + '<div class="rv"><b>' + p.name + '</b><i>' + p.hand.length + ' 张 · ' + (p.alive ? '存活' : '出局') + '</i>'
+      + '<div class="dots">' + dots + '</div></div></div>';
+  }).join('');
+}
+
+function setClaim(text) {
+  HUD.claim.textContent = text || '';
+  HUD.claim.style.opacity = text ? 1 : 0;
+}
+
+function showBanner(text, ms, cls) {
+  HUD.banner.textContent = text;
+  HUD.banner.className = 'banner show ' + (cls || '');
+  if (ms) setTimeout(() => { HUD.banner.className = 'banner ' + (cls || ''); }, ms);
+}
+
+/* ---------- 出牌按钮 ---------- */
+function updatePlayButton() {
+  const p = G.players[G.turn];
+  const yourTurn = p && p.human && G.phase === 'human';
+  HUD.play.disabled = !yourTurn || selected.size === 0 || selected.size > 3;
+  HUD.play.textContent = selected.size ? '出牌（' + selected.size + '）' : '出牌';
+  HUD.challenge.disabled = !yourTurn || !G.lastClaim;
+  HUD.acts.classList.toggle('show', !!yourTurn);
+}
+
+/* ---------- 规则 ---------- */
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function makeDeck() {
+  const deck = [];
+  let id = 0;
+  for (const [rank, n] of DECK_PLAN) for (let i = 0; i < n; i++) deck.push({ id: 'k' + (id++), rank });
+  return shuffle(deck);
+}
+
+function alivePlayers() { return G.players.filter(p => p.alive); }
+function nextAlive(from) {
+  for (let i = 1; i <= G.players.length; i++) {
+    const idx = (from + i) % G.players.length;
+    if (G.players[idx].alive) return idx;
+  }
+  return from;
+}
+
+/* ---------- 一局 ---------- */
+async function dealRound(starter) {
+  G.round++;
+  G.target = RANK_ORDER[Math.floor(Math.random() * RANK_ORDER.length)];
+  const deck = makeDeck();
+  G.players.forEach(p => {
+    p.hand = p.alive ? deck.splice(0, 5) : [];
+    if (!p.human) setRivalCards(p, p.hand.length);
+  });
+  G.pile.forEach(c => c.mesh && scene.remove(c.mesh));
+  G.pile = [];
+  G.lastClaim = null;
+  G.turn = starter;
+  updateHUD();
+  setClaim('');
+  const me = G.players[0];
+  buildHand(me);
+  Audio2.deal();
+  showBanner('第 ' + G.round + ' 局 · 本局作物：' + CARD_RANKS[G.target].cn, 1600);
+  await T(900);
+}
+
+/* ---------- 出牌动画 ---------- */
+async function flyCardsToPile(p, cards, fromMeshes) {
+  const pileBase = PILE_POS.clone();
+  const jobs = cards.map((card, i) => {
+    let mesh;
+    if (fromMeshes && fromMeshes[i]) {
+      mesh = fromMeshes[i];
+      mesh.updateWorldMatrix(true, false);
+      scene.attach(mesh);
+    } else {
+      mesh = cardMesh(card.rank, false);
+      const src = p.cardsGroup ? p.cardsGroup.getWorldPosition(new THREE.Vector3()) : p.animal.group.position.clone().add(new THREE.Vector3(0, 0.9, 0));
+      mesh.position.copy(src);
+      scene.add(mesh);
+    }
+    mesh.rotation.set(0, Math.random() * 0.4 - 0.2, 0);
+    const dest = pileBase.clone().add(new THREE.Vector3((i - 1) * 0.035, 0.004 + i * 0.004, (i - 1) * 0.02));
+    return tween(mesh.position, { x: dest.x, y: dest.y, z: dest.z }, 0.42, easeOut).then(() => {
+      G.pile.push({ card, mesh });
+    });
+  });
+  await Promise.all(jobs);
+  Audio2.play();
+}
+
+/* ---------- 质疑：摊牌 ---------- */
+async function revealPile() {
+  const jobs = G.pile.map((entry, i) => {
+    const m = entry.mesh;
+    const dest = PILE_POS.clone().add(new THREE.Vector3((i - (G.pile.length - 1) / 2) * 0.1, 0.012, 0));
+    return Promise.all([
+      tween(m.position, { x: dest.x, y: dest.y, z: dest.z }, 0.32, easeOut),
+      tween(m.rotation, { x: 0, y: 0, z: 0 }, 0.3, easeOut)
+    ]);
+  });
+  await Promise.all(jobs);
+  await sleep(120);
+}
+
+/* ---------- 转轮 ---------- */
+function aimPoseFor(p) {
+  if (p.human) return new THREE.Vector3(0.36, CAM_POS.y - 0.24, CAM_POS.z - 0.94);
+  const head = p.animal.group.position.clone().add(new THREE.Vector3(0, 1.12, 0));
+  const toCenter = new THREE.Vector3(0, 0, 0).sub(p.animal.group.position).setY(0);
+  if (toCenter.lengthSq() < 1e-4) toCenter.set(0, 0, 1);
+  toCenter.normalize();
+  const aim = head.clone().addScaledVector(toCenter, 0.58);
+  aim.y = head.y - 0.18;
+  return aim;
+}
+function aimRotFor(p) {
+  if (p.human) return -0.44;
+  const toCenter = new THREE.Vector3(0, 0, 0).sub(p.animal.group.position).setY(0);
+  if (toCenter.lengthSq() < 1e-4) toCenter.set(0, 0, 1);
+  toCenter.normalize();
+  return Math.atan2(-toCenter.x, -toCenter.z);
+}
+
+async function roulette(p) {
+  G.phase = 'roulette';
+  updatePlayButton();
+  const gun = p.gunMesh;
+  const aimPos = aimPoseFor(p);
+  const aimRotY = aimRotFor(p);
+  const pulseEl = document.getElementById('pulse');
+  pulseEl.classList.add('on');
+  const beat = setInterval(() => Audio2.heart(), 1150);
+  Audio2.heart();
+  await Promise.all([
+    tween(gun.group.position, { x: aimPos.x, y: aimPos.y, z: aimPos.z }, 0.5, easeInOut),
+    tween(gun.group.rotation, { x: 0, y: aimRotY, z: 0 }, 0.5, easeInOut)
+  ]);
+  await T(220);
+
+  /* 转轮 */
+  const spins = 3 + Math.floor(Math.random() * 3);
+  Audio2.spin();
+  await tween(gun.cylinder.rotation, { y: gun.cylinder.rotation.y + spins * Math.PI * 2 }, 1.0, easeOut);
+  await T(260);
+
+  /* 扣扳机 */
+  const shot = (p.gun.count + 1) === p.gun.pos;
+  p.gun.count++;
+  clearInterval(beat);
+  pulseEl.classList.remove('on');
+  Audio2.cock();
+  await tween(gun.hammer.rotation, { x: 0.45 }, 0.16, easeOut);
+  await tween(gun.hammer.rotation, { x: -0.1 }, 0.08, easeOut);
+
+  if (shot) {
+    Audio2.bang();
+    timeScale = 0.35;
+    setTimeout(() => { timeScale = 1; }, 460);
+    showBanner('砰！', 1400, 'bang');
+    flashScreen();
+    await shakeCamera(0.45);
+    updateHUD();
+    return true;
+  }
+  Audio2.click();
+  showBanner('咔。', 900, 'click');
+  updateHUD();
+  await T(500);
+  return false;
+}
+async function holsterGun(p) {
+  const gun = p.gunMesh;
+  const spot = GUN_SPOTS[p.seat.key];
+  await Promise.all([
+    tween(gun.group.position, { x: spot.x, y: TABLE_TOP + 0.06, z: spot.z }, 0.55, easeInOut),
+    tween(gun.group.rotation, { x: 0.02, y: spot.rot, z: Math.PI / 2 }, 0.55, easeInOut)
+  ]);
+}
+
+function flashScreen() {
+  const el = document.getElementById('flash');
+  el.style.transition = 'none';
+  el.style.opacity = '0.85';
+  requestAnimationFrame(() => {
+    el.style.transition = 'opacity .5s ease';
+    el.style.opacity = '0';
+  });
+}
+
+let shake = 0;
+async function shakeCamera(dur) {
+  shake = dur;
+  await sleep(dur * 1000);
+  shake = 0;
+}
+
+/* ---------- 淘汰 ---------- */
+async function eliminate(p) {
+  p.alive = false;
+  p.hand = [];
+  updateHUD();
+  if (p.cardsGroup) p.cardsGroup.visible = false;
+  Audio2.lose();
+  await Promise.all([
+    tween(p.animal.group.rotation, { x: -1.3 }, 0.7, easeInOut),
+    tween(p.animal.group.position, { y: p.animal.group.position.y - 0.55 }, 0.7, easeInOut)
+  ]);
+  if (p.human) {
+    /* 自己中枪：直接结算 */
+  }
+}
+
+/* ---------- AI ---------- */
+function aiDecide(p) {
+  const claim = G.lastClaim;
+  if (claim && claim.by !== p.idx) {
+    const mine = p.hand.filter(c => c.rank === G.target).length;
+    /* 凶一点的算法：默认更爱质疑，三张连出、自己一张都没有的时候尤其凶 */
+    let susp = 0.28 + 0.15 * Math.max(0, claim.count - 1) + 0.10 * mine + p.ai.suspicion;
+    if (claim.count >= 3) susp += 0.12;
+    if (mine === 0 && claim.count >= 2) susp += 0.08;
+    const claimer = G.players[claim.by];
+    susp += 0.1 * Math.min(2, claimer.caught || 0);
+    susp -= 0.07 * Math.min(2, claimer.honestCount || 0);
+    /* 手里牌快没了就想搏一把 */
+    if (p.hand.length <= 1) susp += 0.15;
+    susp = Math.max(0.08, Math.min(0.92, susp));
+    if (Math.random() < susp) return { type: 'challenge' };
+  }
+
+  const targetCards = p.hand.filter(c => c.rank === G.target);
+  const wilds = p.hand.filter(c => c.rank === 'joker' || c.rank === 'crown');
+  const lie = Math.random() < p.ai.bluff;
+  let cards;
+  if (!lie && targetCards.length) {
+    const n = Math.min(targetCards.length, 1 + Math.floor(Math.random() * 3));
+    cards = targetCards.slice(0, n);
+  } else {
+    const others = p.hand.filter(c => c.rank !== G.target);
+    if (!others.length) {
+      cards = targetCards.slice(0, Math.min(3, targetCards.length)) || [p.hand[0]];
+    } else {
+      const n = Math.min(others.length, 1 + Math.floor(Math.random() * 3));
+      cards = others.slice(0, n);
+    }
+  }
+  if (!cards || !cards.length) cards = [p.hand[0]];
+  if (wilds.length && Math.random() < 0.45) cards = cards.concat(wilds.slice(0, 1)).slice(0, 3);
+  return { type: 'play', cards };
+}
+
+/* ---------- 人类操作 ---------- */
+function humanTurn() {
+  G.phase = 'human';
+  updatePlayButton();
+  setClaim(G.lastClaim
+    ? '「' + G.players[G.lastClaim.by].name + '」声称：' + G.lastClaim.count + ' 张' + CARD_RANKS[G.target].cn
+    : '轮到你出牌，从手里选 1–3 张，声称是「' + CARD_RANKS[G.target].cn + '」');
+  return new Promise(res => { G.humanResolve = res; });
+}
+
+function resolveHuman(action) {
+  if (!G.humanResolve) return;
+  const r = G.humanResolve;
+  G.humanResolve = null;
+  G.phase = 'wait';
+  updatePlayButton();
+  selected.clear();
+  r(action);
+}
+
+HUD.play.addEventListener('click', () => {
+  const p = G.players[0];
+  const cards = handMeshes.filter(it => selected.has(it.card.id)).map(it => it.card);
+  if (!cards.length || cards.length > 3) return;
+  const meshes = handMeshes.filter(it => selected.has(it.card.id)).map(it => it.mesh);
+  resolveHuman({ type: 'play', cards, meshes });
+});
+
+HUD.challenge.addEventListener('click', () => {
+  resolveHuman({ type: 'challenge' });
+});
+
+document.getElementById('btnHelp').addEventListener('click', () => {
+  document.getElementById('help').classList.add('show');
+});
+document.getElementById('btnHelpClose').addEventListener('click', () => {
+  document.getElementById('help').classList.remove('show');
+});
+if (PARAMS.has('help')) document.getElementById('help').classList.add('show');
+
+/* ---------- 点击选牌 ---------- */
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+function pickHand(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  ndc.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  ray.setFromCamera(ndc, camera);
+  const hits = ray.intersectObjects(handMeshes.map(i => i.mesh), false);
+  if (!hits.length) return null;
+  return hits[0].object.userData.item;
+}
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  Audio2.unlock();
+  Audio2.ambient();
+  if (G.phase !== 'human') return;
+  const item = pickHand(e);
+  if (!item) return;
+  if (selected.has(item.card.id)) selected.delete(item.card.id);
+  else {
+    if (selected.size >= 3) return;
+    selected.add(item.card.id);
+  }
+  Audio2.click();
+  layoutHand();
+});
+
+/* ---------- 主循环 ---------- */
+async function playRound() {
+  G.phase = 'turn';
+  updateHUD();
+  let guard = 0;
+  while (true) {
+    if (++guard > 400) throw new Error('回合数失控');
+    const p = G.players[G.turn];
+    if (!p.alive) { G.turn = nextAlive(G.turn); continue; }
+
+    let action;
+    if (p.human) {
+      if (G.auto) {
+        await T(500);
+        action = aiDecide(p);
+      } else {
+        action = await humanTurn();
+      }
+    } else {
+      G.phase = 'ai';
+      setClaim('「' + p.name + '」在想…');
+      updateHUD();
+      await T(700 + Math.random() * 700);
+      action = aiDecide(p);
+    }
+
+    if (action.type === 'challenge') {
+      await resolveChallenge(p);
+      return;
+    }
+
+    /* 出牌 */
+    const cards = action.cards;
+    /* 人类的牌有自己的网格，必须把它们一起交出去，否则手里会留下一张“幽灵牌” */
+    const meshes = p.human
+      ? handMeshes.filter(it => cards.includes(it.card)).map(it => it.mesh)
+      : null;
+    if (p.human) {
+      p.hand = p.hand.filter(c => !cards.includes(c));
+      handMeshes = handMeshes.filter(it => !cards.includes(it.card));
+    } else {
+      p.hand = p.hand.filter(c => !cards.includes(c));
+      setRivalCards(p, p.hand.length);
+    }
+    G.players[G.turn].handCount = p.hand.length;
+    const prevLies = G.lastClaim ? G.lastClaim.lies : 0;
+
+    /* 谎话检测（真的有没有说谎） */
+    const isLie = cards.some(c => c.rank !== G.target && c.rank !== 'joker' && c.rank !== 'crown');
+    G.lastClaim = {
+      by: p.idx,
+      count: cards.length,
+      cards: cards.slice(),
+      isLie,
+      lies: 0,
+      honest: 0
+    };
+    G.phase = 'wait';
+    updatePlayButton();
+    setClaim('「' + p.name + '」打出 ' + cards.length + ' 张 · 声称是' + CARD_RANKS[G.target].cn);
+    await flyCardsToPile(p, cards, meshes);
+    if (Math.random() < 0.6) Audio2.creak();
+    if (p.human) buildHand(p);
+    updateHUD();
+
+    if (p.hand.length === 0) {
+      await T(400);
+      showBanner('牌打完了，这一局无人开枪', 1200);
+      return;
+    }
+    G.turn = nextAlive(G.turn);
+  }
+}
+
+async function resolveChallenge(challenger) {
+  G.phase = 'resolve';
+  camPushTarget = 1;
+  updatePlayButton();
+  setClaim('');
+  showBanner('「' + challenger.name + '」：我质疑！', 1400, 'shout');
+  Audio2.click();
+  await T(700);
+  await revealPile();
+
+  const claim = G.lastClaim;
+  const liar = claim.isLie;
+  const claimer = G.players[claim.by];
+  if (liar) claimer.caught = (claimer.caught || 0) + 1;
+  else claimer.honestCount = (claimer.honestCount || 0) + 1;
+  const loser = liar ? G.players[claim.by] : challenger;
+  const text = liar
+    ? '真的是假的！「' + G.players[claim.by].name + '」说谎'
+    : '是真的。「' + challenger.name + '」冤枉人';
+  showBanner(text, 1800, liar ? 'bang' : 'click');
+  await T(1200);
+
+  const shot = await roulette(loser);
+  if (shot) await eliminate(loser);
+  await T(350);
+  await holsterGun(loser);
+  camPushTarget = 0;
+  await T(300);
+
+  /* 清桌 */
+  G.pile.forEach(entry => { if (entry.mesh) scene.remove(entry.mesh); });
+  G.pile = [];
+  G.lastClaim = null;
+  setClaim('');
+  updateHUD();
+}
+
+async function gameLoop() {
+  G.over = false;
+  let starter = 0;
+  while (!G.over) {
+    if (alivePlayers().length <= 1) break;
+    if (!G.players[starter].alive) starter = nextAlive(starter);
+    await dealRound(starter);
+    await playRound();
+    starter = nextAlive(G.turn);
+    if (alivePlayers().length <= 1) break;
+  }
+  gameOver();
+}
+
+function gameOver() {
+  G.over = true;
+  G.phase = 'over';
+  const winner = alivePlayers()[0];
+  const youWin = winner && winner.human;
+  HUD.overTitle.textContent = youWin ? '你活着走出了院子' : '你倒在了桌子底下';
+  HUD.overText.textContent = youWin
+    ? '最后一把枪没有响。'
+    : (winner ? '「' + winner.name + '」' + SPECIES[winner.kind].cn + ' 活到了最后。' : '全都没了。');
+  HUD.over.classList.add('show');
+  HUD.acts.classList.remove('show');
+  setClaim('');
+  if (youWin) Audio2.win(); else Audio2.lose();
+}
+
+/* ---------- 无渲染模拟（自测用：?sim=20） ---------- */
+async function simulate(n) {
+  G.auto = true;
+  const lines = [];
+  for (let i = 0; i < n; i++) {
+    try {
+      await newGame();
+      const w = alivePlayers()[0];
+      lines.push('g' + i + '=' + (w ? w.name + '(' + w.kind + w.seat.key + ')' : 'none') + '/' + G.round + '局');
+      const el0 = document.getElementById('boot'); el0.textContent = 'SIM ' + lines.join(' | ');
+    } catch (e) {
+      lines.push('g' + i + '=ERR:' + (e && e.message));
+      break;
+    }
+  }
+  const el = document.getElementById('boot');
+  el.classList.remove('gone');
+  el.textContent = 'SIM ' + lines.join(' | ');
+}
+/* ---------- 开一局 ---------- */
+async function newGame() {
+  HUD.over.classList.remove('show');
+  G.players = animals.map((a, i) => ({
+    idx: i,
+    animal: a,
+    kind: a.kind,
+    name: a.name,
+    seat: a.seat,
+    human: a.seat.key === 'S',
+    alive: true,
+    hand: [],
+    gun: { pos: 1 + Math.floor(Math.random() * 6), count: 0 },
+    ai: { bluff: 0.45 + Math.random() * 0.4, suspicion: Math.random() * 0.26 }
+  }));
+  G.round = 0;
+  G.pile = [];
+  G.lastClaim = null;
+  G.over = false;
+  G.players.forEach(p => {
+    if (!p.animal.group) return;
+    p.animal.group.rotation.set(0, p.animal.group.rotation.y, 0);
+    p.animal.group.position.y = 0.44;
+    p.animal.group.visible = !p.human;
+    if (p.cardsGroup) { p.cardsGroup.visible = true; }
+  });
+  placeGuns();
+  updateHUD();
+  if (PARAMS.get('demo') === 'aim') {
+    const me = G.players[0];
+    me.gunMesh.group.position.copy(aimPoseFor(me));
+    me.gunMesh.group.rotation.set(0, aimRotFor(me), 0);
+    return;
+  }
+  if (PARAMS.get('demo') === 'gun') {
+    const me = G.players[0];
+    me.gun.pos = 2; me.gun.count = 1;
+    await roulette(me);
+    return;
+  }
+  await gameLoop();
+}
+
+/* ================= 镜头：座位视角 + 轻微转头 ================= */
+const look = { yaw: 0, pitch: 0, tYaw: 0, tPitch: 0 };
+window.addEventListener('pointermove', (e) => {
+  const nx = (e.clientX / window.innerWidth) * 2 - 1;
+  const ny = (e.clientY / window.innerHeight) * 2 - 1;
+  look.tYaw = -nx * 0.14;
+  look.tPitch = -ny * 0.07;
+});
+window.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'touch') {
+    look.tYaw = -(e.clientX / window.innerWidth * 2 - 1) * 0.16;
+  }
+});
+
+let camPush = 0, camPushTarget = 0, timeScale = 1;
+
+function updateCamera(dt, now) {
+  camPush += (camPushTarget - camPush) * Math.min(1, dt * 2.2);
+  look.yaw += (look.tYaw - look.yaw) * Math.min(1, dt * 3.5);
+  look.pitch += (look.tPitch - look.pitch) * Math.min(1, dt * 3.5);
+  const breathe = Math.sin(now * 0.0009) * 0.004;
+  camera.position.set(CAM_POS.x, CAM_POS.y + breathe, CAM_POS.z);
+  camera.lookAt(CAM_LOOK);
+  camera.rotateY(look.yaw);
+  camera.rotateX(look.pitch);
+}
+
+/* ================= 尺寸 ================= */
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  /* 竖屏手机横向视野太窄，坐得近一点、低头一点，画面才不空 */
+  if (camera.aspect < 0.85) {
+    CAM_POS.set(0, 1.28, 1.74);
+    CAM_LOOK.set(0, 0.74, -0.32);
+    camera.fov = 64;
+  } else if (camera.aspect < 1.3) {
+    CAM_POS.set(0, 1.36, 1.98);
+    CAM_LOOK.set(0, 0.78, -0.40);
+    camera.fov = 60;
+  } else {
+    CAM_POS.set(0, 1.40, 2.24);
+    CAM_LOOK.set(0, 0.80, -0.45);
+    camera.fov = 55;
+  }
+  camera.updateProjectionMatrix();
+  /* 手牌跟着屏幕比例缩放，竖屏才不会把手牌切掉 */
+  const hs = camera.aspect < 0.85 ? 0.62 : (camera.aspect < 1.3 ? 0.85 : 1);
+  handGroup.scale.setScalar(hs);
+  handGroup.position.y = -0.185;
+}
+window.addEventListener('resize', resize);
+
+/* ================= 启动 ================= */
+resize();
+spawnSeats(Date.now() % 100000);
+if (SIM) simulate(Math.max(1, parseInt(PARAMS.get('sim'), 10) || 1)).catch(e => { const el = document.getElementById('boot'); el.classList.remove('gone'); el.textContent = 'SIM ERR ' + ((e && e.stack) || e); });
+else newGame();
+
+let last = performance.now();
+let booted = false;
+
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000) * timeScale;
+  last = now;
+  updateTweens(dt);
+  idleAnimals(dt, now);
+  updateAtmosphere(dt, now);
+  updateCamera(dt, now);
+  renderer.render(scene, camera);
+  if (!booted) {
+    booted = true;
+    const b = document.getElementById('boot');
+    b.classList.add('gone');
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* R 或「再来一局」：整页重开，最干净 */
+document.getElementById('btnAgain').addEventListener('click', () => location.reload());
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'r' || e.key === 'R') location.reload();
+});
+
+/* 方便自己调：挂在 window 上 */
+window.__farm = { scene, camera, renderer, animals, spawnSeats, SEATS, SPECIES, G, cardMesh, rnd: Math.random };
+</script>
+</body>
+</html>
