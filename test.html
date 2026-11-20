@@ -3786,6 +3786,67 @@ window.addEventListener('beforeunload', () => {
   } catch (e) {}
 });
 
+
+/* ================= 第三人称：鼠标转视角 + 相对镜头移动 ================= */
+let camYaw = Math.PI, camPitch = 0.22, camDrag = null;
+
+window.addEventListener('pointerdown', (e) => {
+  if (!SPECT.animal || NET.mySeat >= 0) return;
+  if (e.target !== renderer.domElement) return;
+  camDrag = { x: e.clientX, y: e.clientY };
+});
+window.addEventListener('pointermove', (e) => {
+  if (!camDrag) return;
+  camYaw -= (e.clientX - camDrag.x) * 0.006;
+  camPitch = Math.max(-0.2, Math.min(1.0, camPitch + (e.clientY - camDrag.y) * 0.004));
+  camDrag.x = e.clientX;
+  camDrag.y = e.clientY;
+});
+window.addEventListener('pointerup', () => { camDrag = null; });
+
+spectatorCamera = function () {
+  const a = SPECT.animal;
+  if (!a) return;
+  if (!SPECT.camInit) { SPECT.camInit = true; camYaw = a.group.rotation.y; }
+  const dx = Math.sin(camYaw), dz = Math.cos(camYaw);
+  const back = 2.9;
+  const h = 1.75 + camPitch * 1.5;
+  const p = new THREE.Vector3(a.group.position.x - dx * back, h, a.group.position.z - dz * back);
+  camera.position.lerp(p, 0.18);
+  camera.lookAt(a.group.position.x, 1.05, a.group.position.z);
+};
+
+spectatorMove = function (dt) {
+  const a = SPECT.animal;
+  if (!a) return;
+  const k = SPECT.keys;
+  const fwd = (k.w || k.arrowup ? 1 : 0) - (k.s || k.arrowdown ? 1 : 0);
+  const side = (k.d || k.arrowright ? 1 : 0) - (k.a || k.arrowleft ? 1 : 0);
+  if (!fwd && !side) return;
+  const fx = Math.sin(camYaw), fz = Math.cos(camYaw);
+  const rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+  let dx = fx * fwd + rx * side, dz = fz * fwd + rz * side;
+  const len = Math.hypot(dx, dz) || 1;
+  dx /= len; dz /= len;
+  const sp = k.shift ? 4.2 : 2.4;
+  let nx = a.group.position.x + dx * sp * dt;
+  let nz = a.group.position.z + dz * sp * dt;
+  if (Math.abs(nx) < 1.55 && Math.abs(nz) < 1.1) { nx = a.group.position.x; nz = a.group.position.z; }
+  const r = Math.hypot(nx, nz);
+  if (r > 6.6) { nx = nx / r * 6.6; nz = nz / r * 6.6; }
+  a.group.position.x = nx;
+  a.group.position.z = nz;
+  const t = Math.atan2(dx, dz);
+  let d = t - a.group.rotation.y;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  a.group.rotation.y += d * Math.min(1, dt * 10);
+  a.t = (a.t || 0) + dt;
+  if (NET.connected && Date.now() - SPECT.lastPub > 120) {
+    SPECT.lastPub = Date.now();
+    netPublishMv(a);
+  }
+};
 /* ================= 启动 ================= */
 resize();
 spawnSeats(Date.now() % 100000);
