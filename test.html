@@ -3046,8 +3046,7 @@ function loadMqttScript(cb) {
 }
 
 function netBoot() {
-  const room = (PARAMS.get('room') || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-  if (!room) return false;
+  const room = (PARAMS.get('room') || 'farm-main').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'farm-main';
   NET.on = true;
   NET.room = room;
   NET.id = 'p' + Math.random().toString(36).slice(2, 8);
