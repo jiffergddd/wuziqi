@@ -177,45 +177,53 @@
     .acts button{flex:1;padding:14px 0;font-size:15px;border-radius:12px}
     .banner{font-size:26px;top:32%}
     .lobbyCard{width:auto;margin:0 14px}
-  }</style>
+  }  .targetPick{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(4,3,2,.72);z-index:9;backdrop-filter:blur(4px)}
+  .targetPick.show{display:flex}
+  .tpCard{width:min(420px,88vw);padding:24px;border-radius:18px;border:1px solid rgba(255,179,92,.5);background:rgba(24,17,12,.96);box-shadow:0 24px 80px rgba(0,0,0,.7);text-align:center}
+  .tpCard h3{margin:0 0 6px;font-size:22px;color:#f4dfbd}
+  .tpCard p{margin:0 0 18px;font-size:13px;color:#a99478}
+  .tpBtns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .tpBtns button{flex:1;min-width:92px;padding:14px 10px;border-radius:12px;border:1px solid rgba(255,179,92,.55);background:rgba(255,179,92,.16);color:#f4dfbd;font-weight:700;font-size:15px;cursor:pointer}
+  .tpBtns button:active{transform:scale(.97)}
+</style>
 </head>
 <body>
 <div id="scene"></div>
 <div id="vignette"></div>
 <div id="hud">
   <div class="title">
-    <b>骗子农场</b>
+    <b>谷物叶子戏</b>
     <span>第 3 步 · 夜里的牌局</span>
   </div>
   <div class="roster" id="roster"></div>
 </div>
 <div class="topbar">
-  <div class="tag">第 <b id="roundNo">0</b> 局</div>
-  <div class="tag">本局作物 <b id="targetName">—</b></div>
+  <div class="tag">第 <b id="roundNo">0</b> 轮</div>
+  <div class="tag">本轮谷物 <b id="targetName">—</b></div>
 </div>
 <div class="rivals" id="rivals"></div>
 <div class="claim" id="claim"></div>
 <div class="acts" id="acts">
   <button id="btnPlay" disabled>出牌</button>
   <button id="btnChallenge" class="ghost" disabled>质疑</button>
+  <button id="btnPenalty" class="ghost" disabled>认罚</button>
 </div>
 <div class="banner" id="banner"></div>
 <div id="pulse"></div>
 <button id="btnHelp" class="helpBtn">?</button>
 <div class="help" id="help">
   <div class="helpCard">
-    <h3>骗子农场 · 怎么玩</h3>
-    <p>桌上有一把牌：<b>小麦 6、玉米 6、南瓜 6、皇冠 2</b>。皇冠是万能牌，摊牌时算真话。</p>
-    <p>每局会指定一种作物。轮到你时，从手里挑 <b>1–3 张</b>扣在桌上，声称它们都是那种作物——<b>你可以说谎</b>。</p>
-    <p>下一个人可以选择<b>接着出</b>，或者<b>质疑</b>你。质疑就摊牌：牌里只要有一张不是那种作物，你掏枪；全是真牌，质疑的人掏枪。</p>
-    <p>枪里 6 个膛、1 发子弹。轮到你的次数到了那颗子弹，就响——<b>倒下出局</b>。活到最后的人赢。</p>
-    <p>手里牌快没了就少出几张，别把牌打光；也别以为 AI 不会数牌。</p>
+    <h3>叶子戏 · 怎么玩</h3>
+    <p>牌组：<b>小麦 6、玉米 6、南瓜 6、皇冠 2</b>。皇冠是万能牌，算真话。</p>
+    <p>每轮由<b>主家</b>选一种谷物。主家先出 <b>1–3 张</b>，声称都是这种谷物，可以撒谎；下一位选择<b>跟牌、质疑、认罚</b>。</p>
+    <p>质疑就摊牌：上一手有假牌，出牌的人收走桌面所有牌并喝酒；全是真的，质疑的人收牌喝酒。认罚的人直接收走桌面牌并喝酒。</p>
+    <p>喝酒会增加醉意，醉意满 100% 出局。输家收牌后成为下一轮主家；先打空手牌且最后一手没被质疑成功的人赢。</p>
     <button id="btnHelpClose">知道了</button>
   </div>
 </div>
 <div class="entry" id="entry">
   <div class="entryCard">
-    <h2>骗子农场</h2>
+    <h2>谷物叶子戏</h2>
     <p class="entrySub" id="entryRoom">单机</p>
     <input id="entryName" maxlength="8" placeholder="你的名字" autocomplete="off" spellcheck="false">
     <button id="entryGo">进入院子</button>
@@ -237,13 +245,24 @@
   </div>
 </div>
 <div id="flash"></div>
+<div class="targetPick" id="targetPick">
+  <div class="tpCard">
+    <h3>选择本轮谷物</h3>
+    <p>你是主家，本轮大家只能喊这一种谷物</p>
+    <div class="tpBtns">
+      <button data-target="wheat">小麦</button>
+      <button data-target="corn">玉米</button>
+      <button data-target="pumpkin">南瓜</button>
+    </div>
+  </div>
+</div>
 <div class="over" id="over">
   <div class="overCard">
     <h2 id="overTitle">结束</h2>
     <p id="overText"></p>
     <button id="btnAgain">再来一局</button>
   </div>
-</div><div class="hint">点牌选 1–3 张 · 出牌 / 质疑 · R 重开 · <a href="./" style="color:inherit">回五子棋</a></div>
+</div><div class="hint">点牌选 1–3 张 · 出牌 / 质疑 / 认罚 · R 重开 · <a href="./" style="color:inherit">回五子棋</a></div>
 <div id="boot">正在点亮院子…</div>
 
 <script type="module">
@@ -2259,6 +2278,8 @@ const G = {
   target: 'wheat',
   turn: 0,
   pile: [],
+  main: 0,
+  winner: null,
   lastClaim: null,
   round: 0,
   phase: 'boot',
@@ -2282,17 +2303,21 @@ const selected = new Set();
 /* ---------- 手牌布局 ---------- */
 function layoutHand() {
   const n = handMeshes.length;
-  const span = Math.min(0.092 * n, 0.48);
+  const twoRows = n > 8;
+  const perRow = twoRows ? Math.ceil(n / 2) : n;
   handMeshes.forEach((item, i) => {
-    const t = n > 1 ? i / (n - 1) - 0.5 : 0;
+    const row = twoRows && i >= perRow ? 1 : 0;
+    const idx = i - row * perRow;
+    const count = row === 0 ? perRow : n - perRow;
+    const t = count > 1 ? idx / (count - 1) - 0.5 : 0;
     const m = item.mesh;
+    const span = Math.min(0.072 * count, 0.5);
     const lifted = selected.has(item.card.id) ? 0.055 : 0;
-    m.position.set(t * span, lifted - Math.abs(t) * 0.02, -Math.abs(t) * 0.04);
-    m.rotation.set(Math.PI / 2 - 0.42, t * 0.06, -t * 0.2);
+    m.position.set(t * span, lifted - Math.abs(t) * 0.015 - row * 0.115, -Math.abs(t) * 0.035);
+    m.rotation.set(Math.PI / 2 - 0.42, t * 0.05, -t * 0.16);
   });
   updatePlayButton();
 }
-
 function buildHand(p) {
   handMeshes.forEach(it => handGroup.remove(it.mesh));
   handMeshes = [];
@@ -2360,6 +2385,8 @@ const HUD = {
   acts: document.getElementById('acts'),
   play: document.getElementById('btnPlay'),
   challenge: document.getElementById('btnChallenge'),
+  penalty: document.getElementById('btnPenalty'),
+  targetPick: document.getElementById('targetPick'),
   banner: document.getElementById('banner'),
   over: document.getElementById('over'),
   overTitle: document.getElementById('overTitle'),
@@ -2368,20 +2395,15 @@ const HUD = {
 
 function updateHUD() {
   HUD.round.textContent = G.round;
-  HUD.target.textContent = CARD_RANKS[G.target].cn;
-  HUD.rivals.innerHTML = G.players.filter(p => !p.human).map(p => {
-    const dots = Array.from({ length: 6 }, (_, i) => {
-      const spent = i < p.gun.count;
-      const danger = i === p.gun.count && p.gun.count === p.gun.pos - 1;
-      return '<span class="dot' + (spent ? ' spent' : '') + (danger ? ' near' : '') + '"></span>';
-    }).join('');
+  HUD.target.textContent = G.target && CARD_RANKS[G.target] ? CARD_RANKS[G.target].cn : '—';
+  HUD.rivals.innerHTML = G.players.filter(p => !p.local).map(p => {
+    const drunk = Math.max(0, Math.min(100, Math.round(p.drunk || 0)));
     return '<div class="rival' + (p.alive ? '' : ' dead') + (G.players[G.turn] === p ? ' active' : '') + '">'
       + '<span class="em">' + SPECIES[p.kind].emoji + '</span>'
-      + '<div class="rv"><b>' + p.name + (rateOf(p.name) !== null ? ' <em>' + rateOf(p.name) + '%</em>' : '') + '</b><i>' + p.hand.length + ' 张 · ' + (p.alive ? '存活' : '出局') + '</i>'
-      + '<div class="dots">' + dots + '</div></div></div>';
+      + '<div class="rv"><b>' + p.name + (rateOf(p.name) !== null ? ' <em>' + rateOf(p.name) + '%</em>' : '') + '</b><i>' + p.hand.length + ' 张 · ' + (p.alive ? '醉意 ' + drunk + '%' : '出局') + '</i>'
+      + '<div class="dots"><span class="dot' + (drunk >= 75 ? ' near' : '') + '" style="width:' + Math.max(2, 30 * (100 - drunk) / 100) + 'px"></span></div></div></div>';
   }).join('');
 }
-
 function setClaim(text) {
   HUD.claim.textContent = text || '';
   HUD.claim.style.opacity = text ? 1 : 0;
@@ -2393,6 +2415,30 @@ function showBanner(text, ms, cls) {
   if (ms) setTimeout(() => { HUD.banner.className = 'banner ' + (cls || ''); }, ms);
 }
 
+/* ---------- 主家选谷物 ---------- */
+let targetPickResolve = null;
+let targetPickRemote = false;
+function openTargetPick(remote) {
+  targetPickRemote = !!remote;
+  HUD.targetPick.classList.add('show');
+  return new Promise(res => { targetPickResolve = res; });
+}
+function closeTargetPick() {
+  HUD.targetPick.classList.remove('show');
+  targetPickResolve = null;
+}
+HUD.targetPick.querySelectorAll('button[data-target]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = btn.getAttribute('data-target');
+    const remote = targetPickRemote;
+    const res = targetPickResolve;
+    HUD.targetPick.classList.remove('show');
+    targetPickResolve = null;
+    if (remote) { netSend({ type: 'target', target }); return; }
+    if (res) res(target);
+  });
+});
+
 /* ---------- 出牌按钮 ---------- */
 function updatePlayButton() {
   const p = G.players[G.turn];
@@ -2400,6 +2446,7 @@ function updatePlayButton() {
   HUD.play.disabled = !yourTurn || selected.size === 0 || selected.size > 3;
   HUD.play.textContent = selected.size ? '出牌（' + selected.size + '）' : '出牌';
   HUD.challenge.disabled = !yourTurn || !G.lastClaim;
+  HUD.penalty.disabled = !yourTurn || !G.lastClaim;
   HUD.acts.classList.toggle('show', !!yourTurn);
 }
 
@@ -2429,27 +2476,142 @@ function nextAlive(from) {
 }
 
 /* ---------- 一局 ---------- */
-async function dealRound(starter) {
-  G.round++;
-  G.target = RANK_ORDER[Math.floor(Math.random() * RANK_ORDER.length)];
+/* ---------- 叶子戏：开场发牌 / 主家 / 收牌 / 喝酒 ---------- */
+async function dealInitial() {
   const deck = makeDeck();
-  G.players.forEach(p => {
-    p.hand = p.alive ? deck.splice(0, 5) : [];
-    if (p.remote || !p.human) setRivalCards(p, p.hand.length);
-  });
-  G.pile.forEach(c => c.mesh && scene.remove(c.mesh));
+  G.pile.forEach(entry => { if (entry.mesh) scene.remove(entry.mesh); });
   G.pile = [];
   G.lastClaim = null;
-  G.turn = starter;
+  G.target = null;
+  G.over = false;
+  G.winner = null;
+  G.main = 0;
+  G.round = 0;
+  G.players.forEach(p => {
+    p.hand = p.alive ? deck.splice(0, 5) : [];
+    p.drunk = 0;
+    if (p.cardsGroup) p.cardsGroup.visible = true;
+    if (p.animal.headUI) {
+      p.animal.headUI.hp = 100;
+      p.animal.headUI.group.visible = true;
+      refreshHp(p.animal);
+    }
+    if (p.remote || !p.human) setRivalCards(p, p.hand.length);
+  });
+  const me = G.players.find(p => p.local) || G.players.find(p => p.human);
+  if (me) buildHand(me);
+  G.phase = 'turn';
   updateHUD();
   setClaim('');
-  const me = G.players[0];
-  buildHand(me);
   Audio2.deal();
-  showBanner('第 ' + G.round + ' 局 · 本局作物：' + CARD_RANKS[G.target].cn, 1600);
-  await T(900);
+  showBanner('叶子戏开始 · 每人 5 张', 1500);
+  await T(700);
+  if (NET.on && NetHostFlag()) netPublishState('turn');
 }
 
+async function chooseTarget(mainIdx) {
+  const p = G.players[mainIdx];
+  if (!p || !p.alive) return RANK_ORDER[0];
+  G.phase = 'choose';
+  G.turn = mainIdx;
+  G.target = null;
+  G.lastClaim = null;
+  updateHUD();
+  updatePlayButton();
+  if (NET.on && NetHostFlag() && !p.remote) netPublishState('choose');
+  if (G.auto || !p.human) return RANK_ORDER[Math.floor(Math.random() * RANK_ORDER.length)];
+  if (p.remote) {
+    setClaim('等「' + p.name + '」选本轮谷物…');
+    updateHUD();
+    const a = await netWaitAction(p, 'choose');
+    const target = a && a.type === 'target' && RANK_ORDER.includes(a.target)
+      ? a.target
+      : RANK_ORDER[Math.floor(Math.random() * RANK_ORDER.length)];
+    G.target = target;
+    return target;
+  }
+  setClaim('你是主家：选本轮谷物');
+  showBanner('你是主家，选一种谷物', 1100);
+  const target = await openTargetPick(false);
+  closeTargetPick();
+  G.target = target;
+  return target;
+}
+
+function collectPile(p) {
+  const cards = G.pile.map(entry => entry.card);
+  G.pile.forEach(entry => { if (entry.mesh) scene.remove(entry.mesh); });
+  G.pile = [];
+  if (!p.alive) return;
+  p.hand.push(...cards);
+  if (p.local || (!NET.on && p.human)) buildHand(p);
+  else setRivalCards(p, p.hand.length);
+  updateHUD();
+}
+
+async function drink(p, pileCount) {
+  if (!p.alive) return;
+  showBanner('「' + p.name + '」喝酒…', 1000);
+  await T(600);
+  const chance = Math.min(0.85, (p.drunk || 0) / 100 * 0.45 + pileCount * 0.035);
+  const out = Math.random() < chance;
+  p.drunk = Math.min(100, (p.drunk || 0) + 25);
+  if (p.animal.headUI) {
+    p.animal.headUI.hp = 100 - p.drunk;
+    refreshHp(p.animal);
+  }
+  updateHUD();
+  if (out || p.drunk >= 100) {
+    p.drunk = 100;
+    if (p.animal.headUI) { p.animal.headUI.hp = 0; refreshHp(p.animal); }
+    await eliminate(p);
+    showBanner('「' + p.name + '」醉倒了', 1200, 'bang');
+  } else {
+    showBanner('「' + p.name + '」醉意 ' + p.drunk + '%', 1000);
+  }
+}
+
+async function playCards(p, cards) {
+  if (!cards || !cards.length || cards.length > 3) return false;
+  if (!cards.every(c => p.hand.includes(c))) return false;
+  const localHuman = p.human && !p.remote;
+  const meshes = localHuman
+    ? handMeshes.filter(it => cards.includes(it.card)).map(it => it.mesh)
+    : null;
+  p.hand = p.hand.filter(c => !cards.includes(c));
+  if (localHuman) handMeshes = handMeshes.filter(it => !cards.includes(it.card));
+  else setRivalCards(p, p.hand.length);
+  const isLie = cards.some(c => c.rank !== G.target && c.rank !== 'crown');
+  G.lastClaim = { by: p.idx, count: cards.length, cards: cards.slice(), isLie, lies: 0, honest: 0 };
+  G.phase = 'wait';
+  updatePlayButton();
+  setClaim('「' + p.name + '」打出 ' + cards.length + ' 张 · 声称是' + CARD_RANKS[G.target].cn);
+  await flyCardsToPile(p, cards, meshes);
+  if (Math.random() < 0.6) Audio2.creak();
+  netPublishState('turn');
+  if (localHuman) buildHand(p);
+  else setRivalCards(p, p.hand.length);
+  updateHUD();
+
+  if (p.hand.length === 0) {
+    await T(350);
+    if (isLie) {
+      showBanner('最后一手是假牌，收牌喝酒', 1400, 'bang');
+      const pileCount = G.pile.length;
+      collectPile(p);
+      await drink(p, pileCount);
+      G.lastClaim = null;
+      G.main = p.alive ? nextAlive(p.idx) : nextAlive(p.idx);
+      netPublishState('turn');
+    } else {
+      G.over = true;
+      G.winner = p;
+      gameOver();
+    }
+    return true;
+  }
+  return false;
+}
 /* ---------- 出牌动画 ---------- */
 async function flyCardsToPile(p, cards, fromMeshes) {
   const pileBase = PILE_POS.clone();
@@ -2641,14 +2803,16 @@ function aiDecide(p) {
 function humanTurn() {
   G.phase = 'human';
   updatePlayButton();
-  setClaim(G.lastClaim
-    ? '「' + G.players[G.lastClaim.by].name + '」声称：' + G.lastClaim.count + ' 张' + CARD_RANKS[G.target].cn
-    : '轮到你出牌，从手里选 1–3 张，声称是「' + CARD_RANKS[G.target].cn + '」');
+  if (G.lastClaim) {
+    const claimer = G.players[G.lastClaim.by];
+    setClaim('「' + claimer.name + '」出了 ' + G.lastClaim.count + ' 张，声称是「' + CARD_RANKS[G.target].cn + '」 · 跟牌 / 质疑 / 认罚');
+  } else {
+    setClaim('你是主家：选 1–3 张，声称是「' + CARD_RANKS[G.target].cn + '」');
+  }
   showBanner('轮到你了', 900);
   if (NET.on && NetHostFlag()) netPublishState('human');
   return new Promise(res => { G.humanResolve = res; });
 }
-
 function resolveHuman(action) {
   if (!G.humanResolve) return;
   const r = G.humanResolve;
@@ -2674,6 +2838,15 @@ HUD.play.addEventListener('click', () => {
   resolveHuman({ type: 'play', cards, meshes });
 });
 
+HUD.penalty.addEventListener('click', () => {
+  if (NET.on && !netIsHost()) {
+    netSend({ type: 'penalty' });
+    HUD.acts.classList.remove('show');
+    setClaim('已认罚，等收牌…');
+    return;
+  }
+  resolveHuman({ type: 'penalty' });
+});
 HUD.challenge.addEventListener('click', () => {
   if (NET.on && !netIsHost()) {
     netSend({ type: 'challenge' });
@@ -2731,22 +2904,27 @@ async function playRound() {
   G.phase = 'turn';
   updateHUD();
   let guard = 0;
-  while (true) {
+  while (!G.over) {
     if (++guard > 400) throw new Error('回合数失控');
     const p = G.players[G.turn];
-    if (!p.alive) { G.turn = nextAlive(G.turn); continue; }
+    if (!p || !p.alive) { G.turn = nextAlive(G.turn); continue; }
+    if (p.hand.length === 0) {
+      G.over = true;
+      G.winner = p;
+      gameOver();
+      return;
+    }
 
     let action;
-    if (p.human && p.remote) {
+    if (p.remote) {
       G.phase = 'human';
       setClaim('等「' + p.name + '」出牌…');
       updateHUD();
       showBanner('轮到「' + p.name + '」出牌', 1000);
-      action = await netWaitAction(p);
-      if (!action) action = aiDecide(p);
+      action = await netWaitAction(p, 'play');
     } else if (p.human) {
       if (G.auto) {
-        await T(500);
+        await T(350);
         action = aiDecide(p);
       } else {
         action = await humanTurn();
@@ -2755,127 +2933,118 @@ async function playRound() {
       G.phase = 'ai';
       setClaim('「' + p.name + '」在想…');
       updateHUD();
-      await T(700 + Math.random() * 700);
+      await T(500 + Math.random() * 500);
       action = aiDecide(p);
     }
+    if (!action) action = aiDecide(p);
+    if (action.type === 'challenge' && !G.lastClaim) action = aiDecide(p);
+    if (action.type === 'penalty' && !G.lastClaim) action = aiDecide(p);
 
     if (action.type === 'challenge') {
       await resolveChallenge(p);
       return;
     }
-
-    /* 出牌 */
-    const cards = action.cards;
-    /* 只有本机自己的手牌才从 handMeshes 里移除；
-       远程玩家在房主这里的牌背也要同步减少 */
-    const localHuman = p.human && !p.remote;
-    const meshes = localHuman
-      ? handMeshes.filter(it => cards.includes(it.card)).map(it => it.mesh)
-      : null;
-    if (localHuman) {
-      p.hand = p.hand.filter(c => !cards.includes(c));
-      handMeshes = handMeshes.filter(it => !cards.includes(it.card));
-    } else {
-      p.hand = p.hand.filter(c => !cards.includes(c));
-      setRivalCards(p, p.hand.length);
-    }
-    G.players[G.turn].handCount = p.hand.length;
-    const prevLies = G.lastClaim ? G.lastClaim.lies : 0;
-
-    /* 谎话检测（真的有没有说谎） */
-    const isLie = cards.some(c => c.rank !== G.target && c.rank !== 'crown');
-    G.lastClaim = {
-      by: p.idx,
-      count: cards.length,
-      cards: cards.slice(),
-      isLie,
-      lies: 0,
-      honest: 0
-    };
-    G.phase = 'wait';
-    updatePlayButton();
-    setClaim('「' + p.name + '」打出 ' + cards.length + ' 张 · 声称是' + CARD_RANKS[G.target].cn);
-    await flyCardsToPile(p, cards, meshes);
-    if (Math.random() < 0.6) Audio2.creak();
-    netPublishState('turn');
-    if (p.human) buildHand(p);
-    updateHUD();
-
-    if (p.hand.length === 0) {
-      await T(400);
-      showBanner('牌打完了，这一局无人开枪', 1200);
+    if (action.type === 'penalty') {
+      await acceptPenalty(p);
       return;
     }
+    const ended = await playCards(p, action.cards || []);
+    if (ended || G.over) return;
     G.turn = nextAlive(G.turn);
   }
 }
-
 async function resolveChallenge(challenger) {
   G.phase = 'resolve';
-  camPushTarget = 1;
+  camPushTarget = 0;
   updatePlayButton();
   setClaim('');
-  showBanner('「' + challenger.name + '」：我质疑！', 1400, 'shout');
+  showBanner('「' + challenger.name + '」：我质疑！', 1200, 'shout');
   Audio2.click();
-  await T(700);
+  await T(500);
   await revealPile();
 
   const claim = G.lastClaim;
+  if (!claim) return;
   const liar = claim.isLie;
   const claimer = G.players[claim.by];
+  const loser = liar ? claimer : challenger;
+  const winner = liar ? challenger : claimer;
   if (liar) claimer.caught = (claimer.caught || 0) + 1;
   else claimer.honestCount = (claimer.honestCount || 0) + 1;
-  const loser = liar ? G.players[claim.by] : challenger;
-  const text = liar
-    ? '真的是假的！「' + G.players[claim.by].name + '」说谎'
-    : '是真的。「' + challenger.name + '」冤枉人';
-  showBanner(text, 1800, liar ? 'bang' : 'click');
-  await T(1200);
+  showBanner(liar ? '是假牌！「' + claimer.name + '」收牌喝酒' : '是真牌！「' + challenger.name + '」收牌喝酒', 1500, liar ? 'bang' : 'click');
+  await T(900);
 
-  const shot = await roulette(loser);
-  if (shot) {
-    const ui = loser.animal.headUI;
-    ui.hp = Math.max(0, ui.hp - 50);
-    refreshHp(loser.animal);
-    if (ui.hp <= 0) {
-      await eliminate(loser);
-    } else {
-      showBanner('还剩一口气', 1100, 'bang');
-      await T(700);
-    }
-  }
-  await T(350);
-  await holsterGun(loser);
-  camPushTarget = 0;
-  await T(300);
-
-  /* 清桌 */
-  G.pile.forEach(entry => { if (entry.mesh) scene.remove(entry.mesh); });
-  G.pile = [];
+  const pileCount = G.pile.length;
+  collectPile(loser);
+  await drink(loser, pileCount);
   G.lastClaim = null;
-  setClaim('');
+  G.main = winner.alive ? winner.idx : nextAlive(winner.idx);
+  if (winner.alive && winner.hand.length === 0) {
+    G.over = true;
+    G.winner = winner;
+    gameOver();
+    return;
+  }
+  netPublishState('turn');
   updateHUD();
-  if (NET.on && NetHostFlag()) netPublishState('turn');
 }
 
+async function acceptPenalty(p) {
+  G.phase = 'resolve';
+  updatePlayButton();
+  setClaim('');
+  showBanner('「' + p.name + '」认罚，收走桌面牌并喝酒', 1400);
+  await T(550);
+  const pileCount = G.pile.length;
+  collectPile(p);
+  await drink(p, pileCount);
+  G.lastClaim = null;
+  G.main = p.alive ? p.idx : nextAlive(p.idx);
+  if (p.alive && p.hand.length === 0) {
+    G.over = true;
+    G.winner = p;
+    gameOver();
+    return;
+  }
+  netPublishState('turn');
+  updateHUD();
+}
 async function gameLoop() {
   G.over = false;
-  let starter = 0;
+  G.winner = null;
+  await dealInitial();
   while (!G.over) {
     if (alivePlayers().length <= 1) break;
-    if (!G.players[starter].alive) starter = nextAlive(starter);
-    await dealRound(starter);
+    if (!G.players[G.main] || !G.players[G.main].alive) G.main = nextAlive(G.main);
+    const main = G.players[G.main];
+    if (!main) break;
+    if (main.hand.length === 0) {
+      G.over = true;
+      G.winner = main;
+      gameOver();
+      break;
+    }
+    G.round++;
+    const target = await chooseTarget(G.main);
+    if (!target) break;
+    G.target = target;
+    G.lastClaim = null;
+    G.turn = G.main;
+    G.phase = 'turn';
+    updateHUD();
+    showBanner('第 ' + G.round + ' 轮 · 主家「' + main.name + '」定「' + CARD_RANKS[target].cn + '」', 1400);
+    await T(450);
     await playRound();
-    starter = nextAlive(G.turn);
-    if (alivePlayers().length <= 1) break;
+    if (G.over) break;
+    await T(350);
   }
-  gameOver();
+  if (!G.over) gameOver();
 }
-
 function gameOver() {
   G.over = true;
   G.phase = 'over';
-  const winner = alivePlayers()[0];
+  const winner = G.winner && G.players.includes(G.winner) ? G.winner : alivePlayers()[0];
+  G.winner = winner || null;
   if (!SIM) {
     G.players.forEach(p => recordResult(p.name, p === winner));
     const me = G.players.find(p => p.human);
@@ -2883,17 +3052,16 @@ function gameOver() {
     updateBoard();
   }
   const youWin = winner && winner.human;
-  HUD.overTitle.textContent = youWin ? '你活着走出了院子' : '你倒在了桌子底下';
+  HUD.overTitle.textContent = youWin ? '你笑到了最后' : '你被抬下了桌';
   HUD.overText.textContent = youWin
-    ? '最后一把枪没有响。'
-    : (winner ? '「' + winner.name + '」' + SPECIES[winner.kind].cn + ' 活到了最后。' : '全都没了。');
+    ? '最后一张牌落桌，没人能再质疑你。'
+    : (winner ? '「' + winner.name + '」' + SPECIES[winner.kind].cn + ' 还清醒地坐着。' : '全桌都醉了。');
   HUD.over.classList.add('show');
   netPublishState('over');
   HUD.acts.classList.remove('show');
   setClaim('');
   if (youWin) Audio2.win(); else Audio2.lose();
 }
-
 /* ---------- 无渲染模拟（自测用：?sim=20） ---------- */
 async function simulate(n) {
   G.auto = true;
@@ -2923,6 +3091,7 @@ async function newGame(localName) {
     name: a.name,
     seat: a.seat,
     human: a.seat.key === 'S',
+    local: a.seat.key === 'S',
     alive: true,
     hand: [],
     gun: { pos: 1 + Math.floor(Math.random() * 6), count: 0 },
@@ -2949,7 +3118,7 @@ async function newGame(localName) {
     if (p.cardsGroup) { p.cardsGroup.visible = true; }
     if (p.animal.headUI) { p.animal.headUI.hp = 100; p.animal.headUI.group.visible = true; refreshHp(p.animal); }
   });
-  placeGuns();
+  G.players.forEach(p => { if (p.gunMesh) p.gunMesh.group.visible = false; });
   updateHUD();
   if (PARAMS.get('demo') === 'aim') {
     const me = G.players[0];
@@ -3255,6 +3424,13 @@ async function netStartGame() {
     if (G.players[i]) setAnimalName(a, G.players[i].name);
   });
   applyCamSeat(NET.mySeat);
+  G.round = 0;
+  G.pile = [];
+  G.lastClaim = null;
+  G.target = null;
+  G.main = 0;
+  G.winner = null;
+  G.over = false;
   netPublishState();
   await gameLoop();
 }
@@ -3262,14 +3438,17 @@ async function netStartGame() {
 /* ---------- 状态广播 ---------- */
 function netPublishState(phase) {
   if (!NET.on || !NetHostFlag()) return;
+  const winner = G.winner || (G.over ? alivePlayers()[0] : null);
   const st = {
     t: 'state', seq: ++NET.seq, phase: phase || G.phase, round: G.round, target: G.target,
+    main: G.players[G.main] ? G.players[G.main].pid : null,
     turn: G.players[G.turn] ? G.players[G.turn].pid : null,
-    over: G.over, winner: (G.over && alivePlayers()[0]) ? alivePlayers()[0].pid : null,
+    over: G.over, winner: winner ? winner.pid : null,
     claim: G.lastClaim ? { by: G.players[G.lastClaim.by].pid, count: G.lastClaim.count } : null,
     pile: G.pile.length,
     players: G.players.map(p => ({
       pid: p.pid, name: p.name, seat: (typeof p.seatIdx === 'number' ? p.seatIdx : p.idx), alive: p.alive,
+      drunk: Math.round(p.drunk || 0),
       hp: p.animal.headUI ? p.animal.headUI.hp : 100,
       count: p.hand.length
     }))
@@ -3277,7 +3456,6 @@ function netPublishState(phase) {
   NET.client.publish(T_STATE(), JSON.stringify(st), { qos: 1, retain: true });
   G.players.forEach(p => { if (p.remote) netPublishHand(p); });
 }
-
 function NetHostFlag() { return netIsHost(); }
 
 function netPublishHand(p) {
@@ -3309,7 +3487,7 @@ function applyNetState(st) {
   if (!G.players.length) {
     G.players = st.players.map(p => ({
       idx: p.seat, pid: p.pid, human: true, remote: false, local: p.pid === NET.id,
-      alive: p.alive, hand: [], gun: { pos: 1, count: 0 },
+      alive: p.alive, hand: [], drunk: 0, gun: { pos: 1, count: 0 },
       name: p.name, kind: animals[p.seat].kind, seat: SEATS[p.seat], animal: animals[p.seat]
     }));
   }
@@ -3318,28 +3496,48 @@ function applyNetState(st) {
     if (!gp) return;
     gp.alive = p.alive;
     gp.name = p.name;
+    gp.drunk = p.drunk || 0;
     if (p.pid !== NET.id) gp.hand = new Array(p.count || 0);
-    gp.animal.headUI.hp = p.hp;
+    gp.animal.headUI.hp = 100 - gp.drunk;
     gp.animal.group.visible = p.pid !== NET.id && p.alive;
     gp.animal.headUI.group.visible = p.pid !== NET.id && p.alive;
     refreshHp(gp.animal);
   });
   G.turn = Math.max(0, st.players.findIndex(p => p.pid === st.turn));
+  G.main = Math.max(0, st.players.findIndex(p => p.pid === st.main));
   G.lastClaim = st.claim ? { by: st.players.findIndex(p => p.pid === st.claim.by), count: st.claim.count } : null;
   syncNetPile(st.pile || 0);
   updateHUD();
   const me = G.players.find(p => p.local);
   if (me) setRivalCardsCounts();
   if (st.over) {
+    closeTargetPick();
+    G.winner = st.winner ? G.players.find(p => p.pid === st.winner) : null;
     gameOver();
     return;
   }
   if (st.round !== NET.lastRound) { NET.lastRound = st.round; NET.lastTurnPid = ''; }
   const isMyTurn = st.turn === NET.id;
+  if (st.phase === 'choose') {
+    G.phase = 'choose';
+    updatePlayButton();
+    closeTargetPick();
+    if (isMyTurn) {
+      setClaim('你是主家：选本轮谷物');
+      if (!HUD.targetPick.classList.contains('show')) openTargetPick(true);
+    } else {
+      setClaim('等「' + nameOf(st.main, st) + '」选本轮谷物…');
+    }
+    return;
+  }
+  closeTargetPick();
   G.phase = isMyTurn ? 'human' : 'wait';
   updatePlayButton();
+  const targetCn = G.target && CARD_RANKS[G.target] ? CARD_RANKS[G.target].cn : '—';
   if (isMyTurn) {
-    setClaim('轮到你：选 1–3 张，声称是「' + CARD_RANKS[G.target].cn + '」');
+    setClaim(st.claim
+      ? '「' + nameOf(st.claim.by, st) + '」出了 ' + st.claim.count + ' 张，声称是「' + targetCn + '」 · 跟牌 / 质疑 / 认罚'
+      : '你是主家：选 1–3 张，声称是「' + targetCn + '」');
   } else {
     setClaim(st.claim ? '「' + nameOf(st.claim.by, st) + '」出了 ' + st.claim.count + ' 张' : '');
   }
@@ -3348,7 +3546,6 @@ function applyNetState(st) {
     showBanner(isMyTurn ? '轮到你了' : '轮到「' + nameOf(st.turn, st) + '」出牌', 1000);
   }
 }
-
 function nameOf(pid, st) {
   const p = st.players.find(x => x.pid === pid);
   return p ? p.name : '？';
@@ -3381,15 +3578,26 @@ function netOnAct(msg) {
   if (!NET.pending || NET.pending.pid !== msg.pid) return;
   const p = G.players.find(x => x.pid === msg.pid);
   if (!p) return;
+  if (msg.type === 'target') {
+    if (NET.pending.phase !== 'choose') return;
+    if (RANK_ORDER.includes(msg.target)) finishPending({ type: 'target', target: msg.target });
+    return;
+  }
+  if (msg.type === 'penalty') {
+    if (NET.pending.phase !== 'play') return;
+    finishPending({ type: 'penalty' });
+    return;
+  }
   if (msg.type === 'play') {
+    if (NET.pending.phase !== 'play') return;
     const cards = (msg.ids || []).map(id => p.hand.find(c => c.id === id)).filter(Boolean);
     if (!cards.length || cards.length > 3) return;
     finishPending({ type: 'play', cards });
   } else if (msg.type === 'challenge') {
+    if (NET.pending.phase !== 'play') return;
     finishPending({ type: 'challenge' });
   }
 }
-
 function finishPending(action) {
   if (!NET.pending) return;
   const { res, timer } = NET.pending;
@@ -3398,11 +3606,12 @@ function finishPending(action) {
   res(action);
 }
 
-function netWaitAction(p) {
+function netWaitAction(p, phase) {
+  G.phase = phase || 'human';
   return new Promise(res => {
     const timer = setTimeout(() => { NET.pending = null; res(null); }, 60000);
-    NET.pending = { pid: p.pid, res, timer };
-    netPublishState('human');
+    NET.pending = { pid: p.pid, phase: G.phase, res, timer };
+    netPublishState(G.phase);
   });
 }
 /* ---------- 机位对应的相机 ---------- */
