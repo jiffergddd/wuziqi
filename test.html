@@ -2644,6 +2644,7 @@ function humanTurn() {
   setClaim(G.lastClaim
     ? '「' + G.players[G.lastClaim.by].name + '」声称：' + G.lastClaim.count + ' 张' + CARD_RANKS[G.target].cn
     : '轮到你出牌，从手里选 1–3 张，声称是「' + CARD_RANKS[G.target].cn + '」');
+  if (NET.on && NetHostFlag()) netPublishState('human');
   return new Promise(res => { G.humanResolve = res; });
 }
 
@@ -3389,13 +3390,12 @@ function finishPending(action) {
 }
 
 function netWaitAction(p) {
-  netPublishState('human');
   return new Promise(res => {
     const timer = setTimeout(() => { NET.pending = null; res(null); }, 60000);
     NET.pending = { pid: p.pid, res, timer };
+    netPublishState('human');
   });
 }
-
 /* ---------- 机位对应的相机 ---------- */
 function applyCamSeat(seatIdx) {
   NET.mySeat = seatIdx;
