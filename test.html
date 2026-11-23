@@ -3609,6 +3609,7 @@ function applyNetState(st) {
     if (!gp) return;
     gp.alive = p.alive;
     gp.name = p.name;
+    if (gp.animal) setAnimalName(gp.animal, p.name);
     gp.drunk = p.drunk || 0;
     if (p.pid !== NET.id) gp.hand = new Array(p.count || 0);
     gp.animal.headUI.hp = 100 - gp.drunk;
@@ -3840,12 +3841,29 @@ function showEntry() {
   if (!coarse) setTimeout(() => { try { inp.focus(); } catch (e) {} }, 300);
 }
 
+function updateLocalModelName(name) {
+  if (SPECT.animal) {
+    SPECT.animal.name = name;
+    setAnimalName(SPECT.animal, name);
+  }
+  const me = G.players.find(p => p.local) || G.players.find(p => p.human);
+  if (me) {
+    me.name = name;
+    if (me.animal) {
+      me.animal.name = name;
+      setAnimalName(me.animal, name);
+    }
+  }
+  renderRoster();
+  if (NET.connected) netPublishWho();
+}
 function enterAs(name) {
   MYNAME = name;
   try { localStorage.setItem('farm_name', name); } catch (e) {}
   document.getElementById('entry').classList.remove('show');
   if (NET.on) {
     NET.name = name;
+    updateLocalModelName(name);
     loadMqttScript(netConnect);
   } else {
     newGame(name);
