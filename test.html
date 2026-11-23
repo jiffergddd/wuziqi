@@ -3061,11 +3061,8 @@ function netBoot() {
   return true;
 }
 
-const BROKERS = [
-  'wss://broker.emqx.io:8084/mqtt',
-  'wss://broker.hivemq.com:8884/mqtt',
-  'wss://test.mosquitto.org:8081/mqtt'
-];
+/* 统一用一个 broker，避免两个人分别落到 EMQX / HiveMQ 后互相看不见 */
+const BROKERS = ['wss://broker.emqx.io:8084/mqtt'];
 let brokerIdx = 0;
 
 function netStatus(s) {
@@ -3146,21 +3143,30 @@ function netPublishWho() {
     seat: NET.mySeat,
     x: SPECT.animal ? +SPECT.animal.group.position.x.toFixed(2) : 0,
     z: SPECT.animal ? +SPECT.animal.group.position.z.toFixed(2) : 0,
-    ry: SPECT.animal ? +SPECT.animal.group.rotation.y.toFixed(2) : 0
+    ry: SPECT.animal ? +SPECT.animal.group.rotation.y.toFixed(2) : 0,
+    kind: SPECT.animal ? SPECT.animal.kind : 'cat'
   }), { qos: 1, retain: true });
 }
 
 function netOnWho(id, msg) {
+  if (id === NET.id) return;
   if (msg && Date.now() - (msg.ts || 0) > 20000) {
-    /* 服务器上留着的旧心跳，早就不在线了 */
-    if (NET.peers.delete(id)) { netLobby(); syncChairAnimals(); }
+    NET.peers.delete(id);
+    removeRemoteSpectator(id);
+    netLobby();
+    syncChairAnimals();
     return;
   }
-  if (msg) NET.peers.set(id, msg);
-  else NET.peers.delete(id);
+  if (msg) {
+    NET.peers.set(id, msg);
+    upsertRemoteSpectator(msg);
+  } else {
+    NET.peers.delete(id);
+    removeRemoteSpectator(id);
+  }
+  syncChairAnimals();
   netLobby();
 }
-
 function netOrder() {
   const all = [{ id: NET.id, name: NET.name, ts: NET.joined || Date.now() }, ...NET.peers.values()];
   all.sort((a, b) => ((a.joined || a.ts) - (b.joined || b.ts)) || String(a.id).localeCompare(String(b.id)));
@@ -3173,7 +3179,7 @@ function gcPeers() {
   const now = Date.now();
   let changed = false;
   for (const [id, p] of NET.peers) {
-    if (now - (p.ts || 0) > 20000) { NET.peers.delete(id); changed = true; }
+    if (now - (p.ts || 0) > 20000) { NET.peers.delete(id); removeRemoteSpectator(id); changed = true; }
   }
   if (changed) { netLobby(); syncChairAnimals(); netStatus('online'); }
 }
@@ -3393,6 +3399,7 @@ function netWaitAction(p) {
 /* ---------- 机位对应的相机 ---------- */
 function applyCamSeat(seatIdx) {
   NET.mySeat = seatIdx;
+  SPECT.on = seatIdx < 0;
   const s = SEATS[seatIdx] || SEATS[0];
   const dir = new THREE.Vector3(s.pos.x, 0, s.pos.z);
   if (dir.lengthSq() < 1e-4) dir.set(0, 0, 1);
@@ -3553,37 +3560,64 @@ function spectatorMove(dt) {
 }
 
 function netPublishMv(a) {
-  if (!NET.client) return;
+  if (!NET.client || NET.mySeat >= 0) return;
   NET.client.publish(T_MV(), JSON.stringify({
     t: 'mv', id: NET.id, name: MYNAME, kind: a.kind,
-    x: +a.group.position.x.toFixed(2), z: +a.group.position.z.toFixed(2), ry: +a.group.rotation.y.toFixed(2)
+    x: +a.group.position.x.toFixed(2), z: +a.group.position.z.toFixed(2), ry: +a.group.rotation.y.toFixed(2),
+    seat: NET.mySeat
   }), { qos: 0 });
 }
-
 function netOnMv(msg) {
   if (!msg || msg.t !== 'mv' || msg.id === NET.id) return;
-  if (NET.peers.size === 0) return;
+  if (typeof msg.seat === 'number' && msg.seat >= 0) {
+    removeRemoteSpectator(msg.id);
+    return;
+  }
+  upsertRemoteSpectator(msg);
+}
+
+function upsertRemoteSpectator(msg) {
+  if (!msg || msg.id === NET.id) return;
+  if (typeof msg.seat === 'number' && msg.seat >= 0) {
+    removeRemoteSpectator(msg.id);
+    return;
+  }
+  const x = Number.isFinite(msg.x) ? msg.x : 0;
+  const z = Number.isFinite(msg.z) ? msg.z : 0;
   let e = SPECT.others.get(msg.id);
   if (!e) {
-    const rng = mulberry(msg.id.length * 977 + 13);
+    const rng = mulberry(String(msg.id).length * 977 + 13);
     const a = buildAnimal(msg.kind || 'cat', rng);
-    a.group.position.set(msg.x, 0, msg.z);
+    a.group.position.set(x, 0, z);
     a.group.rotation.y = msg.ry || 0;
-    a.name = msg.name || '观战者';
+    a.kind = msg.kind || 'cat';
+    a.name = msg.name || '玩家';
     scene.add(a.group);
     attachHeadUI(a);
     if (a.headUI) {
       setAnimalName(a, a.name);
       if (a.headUI.bar) a.headUI.bar.visible = false;
     }
-    e = { animal: a, tx: msg.x, tz: msg.z };
+    e = { animal: a, tx: x, tz: z };
     SPECT.others.set(msg.id, e);
   }
-  e.tx = msg.x;
-  e.tz = msg.z;
+  e.tx = x;
+  e.tz = z;
+  e.animal.group.visible = true;
   e.animal.group.rotation.y = msg.ry || 0;
+  if (msg.name && e.animal.name !== msg.name) {
+    e.animal.name = msg.name;
+    setAnimalName(e.animal, msg.name);
+  }
 }
 
+function removeRemoteSpectator(id) {
+  const e = SPECT.others.get(id);
+  if (!e) return;
+  scene.remove(e.animal.group);
+  if (e.animal.headUI && e.animal.headUI.group) scene.remove(e.animal.headUI.group);
+  SPECT.others.delete(id);
+}
 function updateSpectators(dt) {
   for (const e of SPECT.others.values()) {
     const a = e.animal;
@@ -3697,6 +3731,7 @@ function standUp() {
 
 function applyMySeat() {
   const seated = NET.mySeat >= 0;
+  SPECT.on = !seated;
   if (SPECT.animal) {
     SPECT.animal.group.visible = !seated;
     if (SPECT.animal.headUI) SPECT.animal.headUI.group.visible = !seated;
@@ -3902,7 +3937,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 /* 方便自己调：挂在 window 上 */
-window.__farm = { scene, camera, renderer, animals, spawnSeats, SEATS, SPECIES, G, cardMesh, rnd: Math.random };
+window.__farm = { scene, camera, renderer, animals, spawnSeats, SEATS, SPECIES, G, cardMesh, rnd: Math.random, NET, SPECT, applyMySeat, netPublishWho };
 </script>
 </body>
 </html>
