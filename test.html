@@ -210,7 +210,7 @@
 <div class="acts" id="acts">
   <button id="btnPlay" disabled>出牌</button>
   <button id="btnChallenge" class="ghost" disabled>质疑</button>
-  <button id="btnPenalty" class="ghost" disabled>认罚</button>
+  <button id="btnPenalty" class="ghost" disabled style="display:none">认罚</button>
 </div>
 <div class="banner" id="banner"></div>
 <div id="pulse"></div>
@@ -219,9 +219,9 @@
   <div class="helpCard">
     <h3>叶子戏 · 怎么玩</h3>
     <p>牌组：<b>小麦 6、玉米 6、南瓜 6、皇冠 2</b>。皇冠是万能牌，算真话。</p>
-    <p>每轮由<b>主家</b>选一种谷物。主家先出 <b>1–3 张</b>，声称都是这种谷物，可以撒谎；下一位选择<b>跟牌、质疑、认罚</b>。</p>
-    <p>质疑就摊牌：上一手有假牌，出牌的人收走桌面所有牌并喝酒；全是真的，质疑的人收牌喝酒。认罚的人直接收走桌面牌并喝酒。</p>
-    <p>喝酒会增加醉意，醉意满 100% 出局。输家收牌后成为下一轮主家；先打空手牌且最后一手没被质疑成功的人赢。</p>
+    <p>每轮由<b>主家</b>选一种谷物。主家先出 <b>1–3 张</b>，声称都是这种谷物，可以撒谎。</p>
+    <p>每次有人出牌后，其他存活玩家都有一次<b>抢质疑</b>机会：质疑成功，除了质疑者以外所有人喝酒；质疑失败，只有质疑者喝酒。然后重新抽牌开始。</p>
+    <p>如果没人质疑，下一位继续跟牌；出牌者打空手牌且没人质疑就赢。喝酒会增加醉意，满 100% 出局并倒在椅子上。</p>
     <button id="btnHelpClose">知道了</button>
   </div>
 </div>
@@ -266,7 +266,7 @@
     <p id="overText"></p>
     <button id="btnAgain">再来一局</button>
   </div>
-</div><div class="hint">点牌选 1–3 张 · 出牌 / 质疑 / 认罚 · R 重开 · <a href="./" style="color:inherit">回五子棋</a></div>
+</div><div class="hint">点牌选 1–3 张 · 出牌后其他人抢质疑 · R 重开 · <a href="./" style="color:inherit">回五子棋</a></div>
 <div id="boot">正在点亮院子…</div>
 
 <script type="module">
@@ -2336,6 +2336,7 @@ const G = {
   pile: [],
   main: 0,
   winner: null,
+  challenge: null,
   lastClaim: null,
   round: 0,
   phase: 'boot',
@@ -2344,6 +2345,7 @@ const G = {
   humanResolve: null
 };
 const T = ms => SIM ? Promise.resolve() : sleep(FAST ? 1 : (G.auto ? Math.min(120, ms * 0.12) : ms));
+const CHALLENGE_MS = 2200;
 
 const handGroup = new THREE.Group();
 handGroup.position.set(0, -0.185, -0.78);
@@ -2498,14 +2500,17 @@ HUD.targetPick.querySelectorAll('button[data-target]').forEach(btn => {
 /* ---------- 出牌按钮 ---------- */
 function updatePlayButton() {
   const p = G.players[G.turn];
+  const local = G.players.find(x => x.local) || G.players.find(x => x.human);
   const yourTurn = p && p.human && G.phase === 'human';
+  const canChallenge = G.phase === 'challenge' && local && local.alive && G.challenge && local.idx !== G.challenge.claimerIdx;
   HUD.play.disabled = !yourTurn || selected.size === 0 || selected.size > 3;
   HUD.play.textContent = selected.size ? '出牌（' + selected.size + '）' : '出牌';
-  HUD.challenge.disabled = !yourTurn || !G.lastClaim;
-  HUD.penalty.disabled = !yourTurn || !G.lastClaim;
-  HUD.acts.classList.toggle('show', !!yourTurn);
+  HUD.challenge.textContent = canChallenge ? '抢质疑' : '质疑';
+  HUD.challenge.disabled = !canChallenge;
+  HUD.penalty.disabled = true;
+  HUD.penalty.style.display = 'none';
+  HUD.acts.classList.toggle('show', !!yourTurn || !!canChallenge);
 }
-
 /* ---------- 规则 ---------- */
 function shuffle(a) {
   for (let i = a.length - 1; i > 0; i--) {
@@ -2539,6 +2544,7 @@ async function dealInitial() {
   G.pile = [];
   G.lastClaim = null;
   G.target = null;
+  G.challenge = null;
   G.over = false;
   G.winner = null;
   G.main = 0;
@@ -2631,42 +2637,117 @@ async function playCards(p, cards) {
   if (!cards || !cards.length || cards.length > 3) return false;
   if (!cards.every(c => p.hand.includes(c))) return false;
   const localHuman = p.human && !p.remote;
-  const meshes = localHuman
-    ? handMeshes.filter(it => cards.includes(it.card)).map(it => it.mesh)
-    : null;
-  p.hand = p.hand.filter(c => !cards.includes(c));
-  if (localHuman) handMeshes = handMeshes.filter(it => !cards.includes(it.card));
-  else setRivalCards(p, p.hand.length);
+  let meshes = null;
+  if (localHuman) {
+    meshes = handMeshes.filter(it => cards.includes(it.card)).map(it => it.mesh);
+    meshes.forEach(m => scene.attach(m));
+    handMeshes = handMeshes.filter(it => !cards.includes(it.card));
+    p.hand = p.hand.filter(c => !cards.includes(c));
+    selected.clear();
+    layoutHand();
+  } else {
+    p.hand = p.hand.filter(c => !cards.includes(c));
+    setRivalCards(p, p.hand.length);
+  }
   const isLie = cards.some(c => c.rank !== G.target && c.rank !== 'crown');
   G.lastClaim = { by: p.idx, count: cards.length, cards: cards.slice(), isLie, lies: 0, honest: 0 };
   G.phase = 'wait';
   updatePlayButton();
   setClaim('「' + p.name + '」打出 ' + cards.length + ' 张 · 声称是' + CARD_RANKS[G.target].cn);
   await flyCardsToPile(p, cards, meshes);
-  if (Math.random() < 0.6) Audio2.creak();
-  netPublishState('turn');
   if (localHuman) buildHand(p);
   else setRivalCards(p, p.hand.length);
   updateHUD();
+  return true;
+}
+function openChallengeWindow(claim, claimer) {
+  return new Promise(resolve => {
+    const c = { claim, claimerIdx: claimer.idx, until: Date.now() + CHALLENGE_MS, resolve };
+    G.challenge = c;
+    G.phase = 'challenge';
+    updatePlayButton();
+    setClaim('「' + claimer.name + '」出了 ' + claim.count + ' 张，抢质疑！');
+    showBanner('抢质疑！', 700, 'shout');
+    netPublishState('challenge');
+    c.timer = setTimeout(() => finishChallengeWindow(null), CHALLENGE_MS);
+  });
+}
 
-  if (p.hand.length === 0) {
-    await T(350);
-    if (isLie) {
-      showBanner('最后一手是假牌，收牌喝酒', 1400, 'bang');
-      const pileCount = G.pile.length;
-      collectPile(p);
-      await drink(p, pileCount);
-      G.lastClaim = null;
-      G.main = p.alive ? nextAlive(p.idx) : nextAlive(p.idx);
-      netPublishState('turn');
-    } else {
-      G.over = true;
-      G.winner = p;
-      gameOver();
+function finishChallengeWindow(challenger) {
+  const c = G.challenge;
+  if (!c) return;
+  G.challenge = null;
+  clearTimeout(c.timer);
+  G.phase = 'turn';
+  updatePlayButton();
+  c.resolve(challenger);
+}
+
+function submitChallenge(pid) {
+  const c = G.challenge;
+  if (!c) return;
+  const p = G.players.find(x => x.pid === pid);
+  if (!p || !p.alive || p.idx === c.claimerIdx) return;
+  finishChallengeWindow(p);
+}
+
+async function drinkMany(list, pileCount) {
+  const drinkers = list.filter(p => p.alive);
+  if (!drinkers.length) return;
+  showBanner(drinkers.map(p => '「' + p.name + '」').join('、') + ' 喝酒…', 1000);
+  await T(350);
+  const out = [];
+  for (const p of drinkers) {
+    const chance = Math.min(0.85, (p.drunk || 0) / 100 * 0.45 + pileCount * 0.035);
+    if (Math.random() < chance) out.push(p);
+    p.drunk = Math.min(100, (p.drunk || 0) + 25);
+    if (p.animal.headUI) {
+      p.animal.headUI.hp = 100 - p.drunk;
+      refreshHp(p.animal);
     }
-    return true;
+    if (p.drunk >= 100) out.push(p);
   }
-  return false;
+  updateHUD();
+  await T(200);
+  const unique = [...new Set(out)];
+  if (unique.length) {
+    showBanner(unique.map(p => '「' + p.name + '」醉倒').join('、'), 1100, 'bang');
+    await Promise.all(unique.map(p => eliminate(p)));
+  }
+}
+
+function startNewRound(mainIdx) {
+  G.pile.forEach(entry => { if (entry.mesh) scene.remove(entry.mesh); });
+  G.pile = [];
+  G.lastClaim = null;
+  G.target = null;
+  G.challenge = null;
+  G.over = false;
+  G.winner = null;
+  const deck = makeDeck();
+  G.players.forEach(p => {
+    p.hand = p.alive ? deck.splice(0, 5) : [];
+    if (p.alive) {
+      p.animal.group.rotation.x = 0;
+      p.animal.group.rotation.z = 0;
+      p.animal.group.position.y = 0.44;
+      p.animal.group.visible = !p.local;
+      if (p.cardsGroup) p.cardsGroup.visible = true;
+      if (p.animal.headUI) {
+        p.animal.headUI.hp = 100 - (p.drunk || 0);
+        p.animal.headUI.group.visible = !p.local;
+        refreshHp(p.animal);
+      }
+    }
+    if (p.remote || !p.human) setRivalCards(p, p.hand.length);
+  });
+  G.main = (G.players[mainIdx] && G.players[mainIdx].alive) ? mainIdx : nextAlive(mainIdx);
+  G.turn = G.main;
+  G.phase = 'turn';
+  const me = G.players.find(p => p.local) || G.players.find(p => p.human);
+  if (me) buildHand(me);
+  updateHUD();
+  showBanner('重新抽牌 · 主家「' + G.players[G.main].name + '」先出', 1200);
 }
 /* ---------- 出牌动画 ---------- */
 async function flyCardsToPile(p, cards, fromMeshes) {
@@ -2685,7 +2766,7 @@ async function flyCardsToPile(p, cards, fromMeshes) {
     }
     mesh.rotation.set(0, Math.random() * 0.4 - 0.2, 0);
     const dest = pileBase.clone().add(new THREE.Vector3((i - 1) * 0.035, 0.004 + i * 0.004, (i - 1) * 0.02));
-    return tween(mesh.position, { x: dest.x, y: dest.y, z: dest.z }, 0.42, easeOut).then(() => {
+    return tween(mesh.position, { x: dest.x, y: dest.y, z: dest.z }, 0.18, easeOut).then(() => {
       G.pile.push({ card, mesh });
     });
   });
@@ -2801,21 +2882,20 @@ async function shakeCamera(dur) {
 
 /* ---------- 淘汰 ---------- */
 async function eliminate(p) {
+  if (!p.alive) return;
   p.alive = false;
+  p.drunk = 100;
   p.hand = [];
   updateHUD();
   if (p.cardsGroup) p.cardsGroup.visible = false;
-  if (p.animal.headUI) { p.animal.headUI.group.visible = false; }
+  if (p.animal.headUI) p.animal.headUI.group.visible = false;
+  p.animal.group.visible = !p.local;
   Audio2.lose();
   await Promise.all([
-    tween(p.animal.group.rotation, { x: -1.3 }, 0.7, easeInOut),
-    tween(p.animal.group.position, { y: p.animal.group.position.y - 0.55 }, 0.7, easeInOut)
+    tween(p.animal.group.rotation, { x: 0.12, z: 1.18 }, 0.65, easeInOut),
+    tween(p.animal.group.position, { y: 0.28 }, 0.65, easeInOut)
   ]);
-  if (p.human) {
-    /* 自己中枪：直接结算 */
-  }
 }
-
 /* ---------- AI ---------- */
 function aiDecide(p) {
   const claim = G.lastClaim;
@@ -2861,7 +2941,7 @@ function humanTurn() {
   updatePlayButton();
   if (G.lastClaim) {
     const claimer = G.players[G.lastClaim.by];
-    setClaim('「' + claimer.name + '」出了 ' + G.lastClaim.count + ' 张，声称是「' + CARD_RANKS[G.target].cn + '」 · 跟牌 / 质疑 / 认罚');
+    setClaim('「' + claimer.name + '」出了 ' + G.lastClaim.count + ' 张，声称是「' + CARD_RANKS[G.target].cn + '」 · 跟牌；你出完后其他人可抢质疑');
   } else {
     setClaim('你是主家：选 1–3 张，声称是「' + CARD_RANKS[G.target].cn + '」');
   }
@@ -2884,10 +2964,17 @@ HUD.play.addEventListener('click', () => {
   if (!cards.length || cards.length > 3) return;
   if (NET.on && !netIsHost()) {
     netSend({ type: 'play', ids: cards.map(c => c.id) });
+    const me = G.players.find(p => p.local);
+    if (me) {
+      me.hand = me.hand.filter(c => !cards.includes(c));
+      const outMeshes = handMeshes.filter(it => cards.includes(it.card)).map(it => it.mesh);
+      outMeshes.forEach(m => handGroup.remove(m));
+      handMeshes = handMeshes.filter(it => !cards.includes(it.card));
+    }
     selected.clear();
     layoutHand();
     HUD.acts.classList.remove('show');
-    setClaim('已出牌，等别人…');
+    setClaim('已出牌，等抢质疑…');
     return;
   }
   const meshes = handMeshes.filter(it => selected.has(it.card.id)).map(it => it.mesh);
@@ -2904,15 +2991,12 @@ HUD.penalty.addEventListener('click', () => {
   resolveHuman({ type: 'penalty' });
 });
 HUD.challenge.addEventListener('click', () => {
-  if (NET.on && !netIsHost()) {
-    netSend({ type: 'challenge' });
-    HUD.acts.classList.remove('show');
-    setClaim('已质疑，等摊牌…');
-    return;
-  }
-  resolveHuman({ type: 'challenge' });
+  if (G.phase !== 'challenge' || !G.challenge) return;
+  HUD.acts.classList.remove('show');
+  setClaim('已抢质疑，等摊牌…');
+  if (NET.on && !netIsHost()) netSend({ type: 'challenge' });
+  else submitChallenge(NET.id);
 });
-
 document.getElementById('entryGo').addEventListener('click', submitEntry);
 document.getElementById('entryNet').addEventListener('click', () => {
   const code = Math.random().toString(36).slice(2, 8);
@@ -2976,11 +3060,11 @@ async function playRound() {
       G.phase = 'human';
       setClaim('等「' + p.name + '」出牌…');
       updateHUD();
-      showBanner('轮到「' + p.name + '」出牌', 1000);
+      showBanner('轮到「' + p.name + '」出牌', 900);
       action = await netWaitAction(p, 'play');
     } else if (p.human) {
       if (G.auto) {
-        await T(350);
+        await T(250);
         action = aiDecide(p);
       } else {
         action = await humanTurn();
@@ -2989,81 +3073,54 @@ async function playRound() {
       G.phase = 'ai';
       setClaim('「' + p.name + '」在想…');
       updateHUD();
-      await T(500 + Math.random() * 500);
+      await T(350 + Math.random() * 300);
       action = aiDecide(p);
     }
-    if (!action) action = aiDecide(p);
-    if (action.type === 'challenge' && !G.lastClaim) action = aiDecide(p);
-    if (action.type === 'penalty' && !G.lastClaim) action = aiDecide(p);
+    if (!action) action = { type: 'play', cards: p.hand.slice(0, Math.min(3, p.hand.length)) };
+    if (action.type !== 'play') action = { type: 'play', cards: p.hand.slice(0, Math.min(3, p.hand.length)) };
 
-    if (action.type === 'challenge') {
-      await resolveChallenge(p);
+    const played = await playCards(p, action.cards || []);
+    if (!played) { G.turn = nextAlive(G.turn); continue; }
+    const challenger = await openChallengeWindow(G.lastClaim, p);
+    if (challenger) {
+      await resolveChallengeRace(challenger);
       return;
     }
-    if (action.type === 'penalty') {
-      await acceptPenalty(p);
+    if (p.hand.length === 0) {
+      G.over = true;
+      G.winner = p;
+      gameOver();
       return;
     }
-    const ended = await playCards(p, action.cards || []);
-    if (ended || G.over) return;
     G.turn = nextAlive(G.turn);
   }
 }
-async function resolveChallenge(challenger) {
-  G.phase = 'resolve';
-  camPushTarget = 0;
-  updatePlayButton();
-  setClaim('');
-  showBanner('「' + challenger.name + '」：我质疑！', 1200, 'shout');
-  Audio2.click();
-  await T(500);
-  await revealPile();
-
+async function resolveChallengeRace(challenger) {
   const claim = G.lastClaim;
   if (!claim) return;
-  const liar = claim.isLie;
   const claimer = G.players[claim.by];
-  const loser = liar ? claimer : challenger;
+  const liar = claim.isLie;
   const winner = liar ? challenger : claimer;
-  if (liar) claimer.caught = (claimer.caught || 0) + 1;
-  else claimer.honestCount = (claimer.honestCount || 0) + 1;
-  showBanner(liar ? '是假牌！「' + claimer.name + '」收牌喝酒' : '是真牌！「' + challenger.name + '」收牌喝酒', 1500, liar ? 'bang' : 'click');
-  await T(900);
-
-  const pileCount = G.pile.length;
-  collectPile(loser);
-  await drink(loser, pileCount);
-  G.lastClaim = null;
-  G.main = winner.alive ? winner.idx : nextAlive(winner.idx);
-  if (winner.alive && winner.hand.length === 0) {
-    G.over = true;
-    G.winner = winner;
-    gameOver();
-    return;
-  }
-  netPublishState('turn');
-  updateHUD();
-}
-
-async function acceptPenalty(p) {
   G.phase = 'resolve';
   updatePlayButton();
   setClaim('');
-  showBanner('「' + p.name + '」认罚，收走桌面牌并喝酒', 1400);
-  await T(550);
+  showBanner(liar ? '质疑成功！除「' + challenger.name + '」外全部喝酒' : '质疑失败！「' + challenger.name + '」一个人喝酒', 1500, liar ? 'bang' : 'click');
+  netPublishState('resolve');
+  await T(450);
+  await revealPile();
   const pileCount = G.pile.length;
-  collectPile(p);
-  await drink(p, pileCount);
+  const drinkers = liar ? alivePlayers().filter(p => p !== challenger) : [challenger];
+  await drinkMany(drinkers, pileCount);
+  G.pile.forEach(entry => { if (entry.mesh) scene.remove(entry.mesh); });
+  G.pile = [];
   G.lastClaim = null;
-  G.main = p.alive ? p.idx : nextAlive(p.idx);
-  if (p.alive && p.hand.length === 0) {
+  if (alivePlayers().length <= 1) {
     G.over = true;
-    G.winner = p;
+    G.winner = alivePlayers()[0] || winner;
     gameOver();
     return;
   }
-  netPublishState('turn');
-  updateHUD();
+  startNewRound(winner.alive ? winner.idx : nextAlive(winner.idx));
 }
 async function gameLoop() {
   G.over = false;
@@ -3555,8 +3612,19 @@ function applyNetState(st) {
     gp.drunk = p.drunk || 0;
     if (p.pid !== NET.id) gp.hand = new Array(p.count || 0);
     gp.animal.headUI.hp = 100 - gp.drunk;
-    gp.animal.group.visible = p.pid !== NET.id && p.alive;
-    gp.animal.headUI.group.visible = p.pid !== NET.id && p.alive;
+    if (p.alive) {
+      gp.animal.group.rotation.x = 0;
+      gp.animal.group.rotation.z = 0;
+      gp.animal.group.position.y = 0.44;
+      gp.animal.group.visible = p.pid !== NET.id;
+      gp.animal.headUI.group.visible = p.pid !== NET.id;
+    } else {
+      gp.animal.group.visible = p.pid !== NET.id;
+      gp.animal.group.rotation.x = 0.12;
+      gp.animal.group.rotation.z = 1.18;
+      gp.animal.group.position.y = 0.28;
+      gp.animal.headUI.group.visible = false;
+    }
     refreshHp(gp.animal);
   });
   G.turn = Math.max(0, st.players.findIndex(p => p.pid === st.turn));
@@ -3572,7 +3640,24 @@ function applyNetState(st) {
     gameOver();
     return;
   }
-  if (st.round !== NET.lastRound) { NET.lastRound = st.round; NET.lastTurnPid = ''; }
+  if (st.phase === 'challenge') {
+    G.challenge = st.claim ? { claimerIdx: G.lastClaim ? G.lastClaim.by : -1, until: 0 } : null;
+    G.phase = 'challenge';
+    updatePlayButton();
+    closeTargetPick();
+    setClaim(st.claim ? '「' + nameOf(st.claim.by, st) + '」出了 ' + st.claim.count + ' 张，抢质疑！' : '');
+    showBanner('抢质疑！', 700, 'shout');
+    return;
+  }
+  if (st.phase === 'resolve') {
+    G.challenge = null;
+    G.phase = 'resolve';
+    updatePlayButton();
+    closeTargetPick();
+    setClaim('');
+    return;
+  }
+  G.challenge = null;  if (st.round !== NET.lastRound) { NET.lastRound = st.round; NET.lastTurnPid = ''; }
   const isMyTurn = st.turn === NET.id;
   if (st.phase === 'choose') {
     G.phase = 'choose';
@@ -3592,7 +3677,7 @@ function applyNetState(st) {
   const targetCn = G.target && CARD_RANKS[G.target] ? CARD_RANKS[G.target].cn : '—';
   if (isMyTurn) {
     setClaim(st.claim
-      ? '「' + nameOf(st.claim.by, st) + '」出了 ' + st.claim.count + ' 张，声称是「' + targetCn + '」 · 跟牌 / 质疑 / 认罚'
+      ? '「' + nameOf(st.claim.by, st) + '」出了 ' + st.claim.count + ' 张，声称是「' + targetCn + '」 · 跟牌；出完后抢质疑'
       : '你是主家：选 1–3 张，声称是「' + targetCn + '」');
   } else {
     setClaim(st.claim ? '「' + nameOf(st.claim.by, st) + '」出了 ' + st.claim.count + ' 张' : '');
@@ -3631,6 +3716,7 @@ function netSend(action) {
 
 function netOnAct(msg) {
   if (!msg || msg.t !== 'act' || !NetHostFlag()) return;
+  if (G.challenge && msg.type === 'challenge') { submitChallenge(msg.pid); return; }
   if (!NET.pending || NET.pending.pid !== msg.pid) return;
   const p = G.players.find(x => x.pid === msg.pid);
   if (!p) return;
