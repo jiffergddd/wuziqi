@@ -2435,7 +2435,7 @@ async function dealRound(starter) {
   const deck = makeDeck();
   G.players.forEach(p => {
     p.hand = p.alive ? deck.splice(0, 5) : [];
-    if (!p.human) setRivalCards(p, p.hand.length);
+    if (p.remote || !p.human) setRivalCards(p, p.hand.length);
   });
   G.pile.forEach(c => c.mesh && scene.remove(c.mesh));
   G.pile = [];
@@ -2644,6 +2644,7 @@ function humanTurn() {
   setClaim(G.lastClaim
     ? '「' + G.players[G.lastClaim.by].name + '」声称：' + G.lastClaim.count + ' 张' + CARD_RANKS[G.target].cn
     : '轮到你出牌，从手里选 1–3 张，声称是「' + CARD_RANKS[G.target].cn + '」');
+  showBanner('轮到你了', 900);
   if (NET.on && NetHostFlag()) netPublishState('human');
   return new Promise(res => { G.humanResolve = res; });
 }
@@ -2740,6 +2741,7 @@ async function playRound() {
       G.phase = 'human';
       setClaim('等「' + p.name + '」出牌…');
       updateHUD();
+      showBanner('轮到「' + p.name + '」出牌', 1000);
       action = await netWaitAction(p);
       if (!action) action = aiDecide(p);
     } else if (p.human) {
@@ -2764,11 +2766,13 @@ async function playRound() {
 
     /* 出牌 */
     const cards = action.cards;
-    /* 人类的牌有自己的网格，必须把它们一起交出去，否则手里会留下一张“幽灵牌” */
-    const meshes = p.human
+    /* 只有本机自己的手牌才从 handMeshes 里移除；
+       远程玩家在房主这里的牌背也要同步减少 */
+    const localHuman = p.human && !p.remote;
+    const meshes = localHuman
       ? handMeshes.filter(it => cards.includes(it.card)).map(it => it.mesh)
       : null;
-    if (p.human) {
+    if (localHuman) {
       p.hand = p.hand.filter(c => !cards.includes(c));
       handMeshes = handMeshes.filter(it => !cards.includes(it.card));
     } else {
@@ -2851,6 +2855,7 @@ async function resolveChallenge(challenger) {
   G.lastClaim = null;
   setClaim('');
   updateHUD();
+  if (NET.on && NetHostFlag()) netPublishState('turn');
 }
 
 async function gameLoop() {
@@ -3025,7 +3030,7 @@ window.addEventListener('resize', resize);
 /* ================= 联机（MQTT 房间） ================= */
 const NET = {
   on: false, id: '', name: '', room: '', client: null, connected: false,
-  peers: new Map(), pending: null, seq: 0, mySeat: 0, hostId: '', started: false, lastState: null
+  peers: new Map(), pending: null, seq: 0, mySeat: 0, hostId: '', started: false, lastState: null, lastTurnPid: '', lastRound: -1
 };
 const NET_BROKER = 'wss://broker.emqx.io:8084/mqtt';
 const T_WHO = id => 'farm/' + NET.room + '/who/' + id;
@@ -3329,14 +3334,18 @@ function applyNetState(st) {
     gameOver();
     return;
   }
+  if (st.round !== NET.lastRound) { NET.lastRound = st.round; NET.lastTurnPid = ''; }
   const isMyTurn = st.turn === NET.id;
   G.phase = isMyTurn ? 'human' : 'wait';
   updatePlayButton();
   if (isMyTurn) {
     setClaim('轮到你：选 1–3 张，声称是「' + CARD_RANKS[G.target].cn + '」');
-    showBanner('轮到你了', 900);
   } else {
     setClaim(st.claim ? '「' + nameOf(st.claim.by, st) + '」出了 ' + st.claim.count + ' 张' : '');
+  }
+  if (st.phase === 'human' && st.turn && st.turn !== NET.lastTurnPid) {
+    NET.lastTurnPid = st.turn;
+    showBanner(isMyTurn ? '轮到你了' : '轮到「' + nameOf(st.turn, st) + '」出牌', 1000);
   }
 }
 
