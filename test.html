@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
-<title>骗子农场 · 黄昏院子（第 1 步）</title>
+<title>谷物叶子戏 · 白天农场</title>
 <link rel="icon" href="data:,">
 <style>
   :root{
@@ -11,20 +11,20 @@
     --amber:#ffb35c; --amber-hot:#ffd39b; --rust:#c8602c;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;height:100%;overflow:hidden;background:#0b0c0e;color:var(--bone);
+  html,body{margin:0;height:100%;overflow:hidden;background:#bfe4f6;color:var(--bone);
     font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
     -webkit-font-smoothing:antialiased}
   #scene{position:fixed;inset:0}
   #scene canvas{display:block}
   #vignette{position:fixed;inset:0;pointer-events:none;
-    background:radial-gradient(ellipse at 50% 45%,rgba(0,0,0,0) 42%,rgba(0,0,0,.55) 100%),
-               linear-gradient(to bottom,rgba(0,0,0,.35),rgba(0,0,0,0) 22%,rgba(0,0,0,0) 72%,rgba(0,0,0,.5));
-    mix-blend-mode:multiply}
+    background:radial-gradient(ellipse at 50% 42%,rgba(255,248,220,.02) 35%,rgba(36,67,35,.14) 100%),
+               linear-gradient(to bottom,rgba(255,255,255,.12),rgba(255,255,255,0) 24%,rgba(255,255,255,0) 72%,rgba(58,76,35,.12));
+    mix-blend-mode:normal}
   #hud{position:fixed;inset:0;pointer-events:none;padding:18px 20px;display:flex;flex-direction:column;justify-content:space-between}
-  .title{font-size:13px;line-height:1.5;letter-spacing:.02em}
+  .title{font-size:13px;line-height:1.5;letter-spacing:.02em;display:inline-block;align-self:flex-start;padding:8px 12px;border-radius:12px;background:linear-gradient(180deg,rgba(255,250,232,.86),rgba(255,250,232,.64));border:1px solid rgba(255,255,255,.45);box-shadow:0 8px 24px rgba(33,55,28,.18);backdrop-filter:blur(6px)}
   .title b{display:block;font-size:20px;letter-spacing:.16em;font-weight:800;
-    text-shadow:0 2px 18px rgba(255,150,60,.35)}
-  .title span{color:var(--bone-dim)}
+    color:#1c3a20;text-shadow:none}
+  .title span{color:rgba(28,58,32,.72)}
   .roster{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:34px}
   .chip{display:flex;align-items:center;gap:8px;padding:7px 12px 7px 9px;border-radius:999px;
     background:rgba(12,14,17,.55);border:1px solid rgba(239,230,214,.16);
@@ -34,9 +34,9 @@
   .chip i{font-style:normal;color:var(--bone-dim);font-size:11px;letter-spacing:.06em}
   .chip.me{border-color:rgba(255,179,92,.65);box-shadow:0 0 0 1px rgba(255,179,92,.25),0 6px 24px rgba(0,0,0,.4)}
   .hint{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);font-size:12px;
-    color:var(--bone-dim);letter-spacing:.06em;white-space:nowrap}
+    color:rgba(255,248,230,.86);letter-spacing:.06em;white-space:nowrap;text-shadow:0 2px 6px rgba(0,0,0,.7)}
   #boot{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-    background:radial-gradient(circle at 50% 40%,#171310,#08090a);font-size:15px;color:var(--bone-dim);
+    background:radial-gradient(circle at 50% 35%,#eefaff,#a9d2e8);font-size:15px;color:#334b3b;
     transition:opacity .5s ease;z-index:9;text-align:center;padding:24px;line-height:1.7}
   #boot.gone{opacity:0;pointer-events:none}
   /* ---------- 心跳 / 帮助 ---------- */
@@ -118,9 +118,10 @@
   .dot{width:7px;height:7px;border-radius:50%;background:rgba(239,230,214,.22);box-shadow:inset 0 0 0 1px rgba(0,0,0,.4)}
   .dot.spent{background:#6f2a20}
   .dot.near{background:#d2622a;box-shadow:0 0 7px #d2622a}
-  .claim{position:fixed;left:22px;top:88px;font-size:14px;line-height:1.7;
-    color:var(--amber-hot);opacity:0;transition:opacity .3s;text-align:left;max-width:340px;
-    text-shadow:0 2px 14px rgba(0,0,0,.9);z-index:3}
+  .claim{position:fixed;left:22px;top:98px;font-size:14px;line-height:1.7;
+  color:var(--amber-hot);opacity:0;transition:opacity .3s;text-align:left;max-width:340px;
+  text-shadow:0 2px 14px rgba(0,0,0,.9);z-index:3;padding:7px 11px;border-radius:10px;
+  background:rgba(18,26,14,.55);border:1px solid rgba(255,240,200,.12);backdrop-filter:blur(6px)}
   .acts{position:fixed;right:22px;bottom:92px;display:flex;flex-direction:column;gap:10px;z-index:4;
     opacity:0;pointer-events:none;transition:opacity .2s}
   .acts.show{opacity:1}
@@ -171,7 +172,10 @@
     .dots{gap:2px;margin-top:2px;justify-content:center}
     .dot{width:4px;height:4px}
 
-    .claim{left:50%;transform:translateX(-50%);top:112px;font-size:12px;max-width:92vw;line-height:1.5;text-align:center}
+    .claim{position:fixed;left:22px;top:98px;font-size:14px;line-height:1.7;
+  color:var(--amber-hot);opacity:0;transition:opacity .3s;text-align:left;max-width:340px;
+  text-shadow:0 2px 14px rgba(0,0,0,.9);z-index:3;padding:7px 11px;border-radius:10px;
+  background:rgba(18,26,14,.55);border:1px solid rgba(255,240,200,.12);backdrop-filter:blur(6px)}
 
     .acts{left:10px;right:10px;bottom:12px;flex-direction:row;gap:8px}
     .acts button{flex:1;padding:14px 0;font-size:15px;border-radius:12px}
@@ -193,7 +197,7 @@
 <div id="hud">
   <div class="title">
     <b>谷物叶子戏</b>
-    <span>第 3 步 · 夜里的牌局</span>
+    <span>第 3 步 · 白天的农场</span>
   </div>
   <div class="roster" id="roster"></div>
 </div>
@@ -288,12 +292,12 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, IS_SMALL ? 1.6 : 2
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = IS_SMALL ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.95;
+renderer.toneMappingExposure = 1.06;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.getElementById('scene').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x241f24, 0.016);
+scene.fog = new THREE.FogExp2(0xd9edf6, 0.0085);
 
 const camera = new THREE.PerspectiveCamera(55, 1, 0.08, 220);
 const CAM_POS = new THREE.Vector3(0, 1.40, 2.24);
@@ -385,6 +389,16 @@ const dirtTex = canvasTex(512, (g, S) => {
   }
 }, 7);
 
+const grassTex = canvasTex(512, (g, S) => {
+  g.fillStyle = '#5f8443'; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 5200; i++) {
+    const x = Math.random() * S, y = Math.random() * S;
+    const v = Math.random();
+    const c = v < 0.5 ? 'rgba(35,72,28,.24)' : (v < 0.8 ? 'rgba(132,164,74,.24)' : 'rgba(210,206,116,.12)');
+    g.strokeStyle = c; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + (Math.random() - 0.5) * 3, y - 4 - Math.random() * 7); g.stroke();
+  }
+}, 7);
 const plankTex = canvasTex(512, (g, S) => {
   const rows = 6, h = S / rows;
   for (let i = 0; i < rows; i++) {
@@ -448,11 +462,11 @@ const cowSpotTex = canvasTex(256, (g, S) => {
 });
 
 /* ================= 灯光 ================= */
-const hemi = new THREE.HemisphereLight(0x6b83b8, 0x2b2118, 0.42);
+const hemi = new THREE.HemisphereLight(0xbfe8ff, 0x5f7038, 0.95);
 scene.add(hemi);
 
-const sun = new THREE.DirectionalLight(0xff9c5e, 0.95);
-sun.position.set(-7.5, 6.2, 5.5);
+const sun = new THREE.DirectionalLight(0xfff1cf, 1.9);
+sun.position.set(-9.5, 14.5, 7.5);
 sun.castShadow = true;
 sun.shadow.mapSize.set(IS_SMALL ? 1024 : 2048, IS_SMALL ? 1024 : 2048);
 const sd = 8.5;
@@ -465,12 +479,12 @@ scene.add(sun);
 scene.add(sun.target);
 sun.target.position.set(0, 0.6, 0);
 
-const moon = new THREE.DirectionalLight(0x9db8ff, 0.6);
+const moon = new THREE.DirectionalLight(0x9db8ff, 0.12);
 moon.position.set(5.5, 7.5, 4.5);
 scene.add(moon);
 
 /* 观众席方向的冷补光：只为了让正脸不至于糊成一团橙 */
-const roomFill = new THREE.PointLight(0x8fa7c8, 1.15, 7, 2);
+const roomFill = new THREE.PointLight(0xfff0cc, 0.5, 9, 2);
 roomFill.position.set(0, 1.55, 2.3);
 scene.add(roomFill);
 
@@ -478,12 +492,12 @@ scene.add(roomFill);
 {
   const skyTex = canvasTex(64, (g, S) => {
     const grd = g.createLinearGradient(0, 0, 0, S);
-    grd.addColorStop(0.00, '#0d1730');
-    grd.addColorStop(0.34, '#2a3457');
-    grd.addColorStop(0.58, '#6a4a63');
-    grd.addColorStop(0.74, '#c66b45');
-    grd.addColorStop(0.86, '#e79a5a');
-    grd.addColorStop(1.00, '#3a2a24');
+    grd.addColorStop(0.00, '#2c8fe5');
+    grd.addColorStop(0.28, '#72c3f5');
+    grd.addColorStop(0.52, '#b9e8ff');
+    grd.addColorStop(0.70, '#e8f7ff');
+    grd.addColorStop(0.84, '#f6efc9');
+    grd.addColorStop(1.00, '#8faa61');
     g.fillStyle = grd; g.fillRect(0, 0, S, S);
   });
   skyTex.mapping = THREE.EquirectangularReflectionMapping;
@@ -505,17 +519,54 @@ scene.add(roomFill);
   }
   const sg = new THREE.BufferGeometry();
   sg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  scene.add(new THREE.Points(sg, new THREE.PointsMaterial({
+  const stars = new THREE.Points(sg, new THREE.PointsMaterial({
     color: 0xcfe0ff, size: 0.55, sizeAttenuation: true, transparent: true,
-    opacity: 0.85, depthWrite: false, fog: false
-  })));
+    opacity: 0.0, depthWrite: false, fog: false
+  }));
+  stars.visible = false;
+  scene.add(stars);
+
+  /* 白天云朵和太阳 */
+  const cloudTex = canvasTex(256, (g, S) => {
+    g.clearRect(0, 0, S, S);
+    for (let i = 0; i < 18; i++) {
+      const x = S * (0.2 + Math.random() * 0.6), y = S * (0.35 + Math.random() * 0.3);
+      const r = S * (0.12 + Math.random() * 0.18);
+      const rg = g.createRadialGradient(x, y, 0, x, y, r);
+      rg.addColorStop(0, 'rgba(255,255,255,.85)');
+      rg.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = rg; g.beginPath(); g.arc(x, y, r, 0, 6.283); g.fill();
+    }
+  });
+  const cloudMat = new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0.62, depthWrite: false, fog: false });
+  const cloudSpots = [[-42, 24, -62, 26, 10], [18, 31, -72, 22, 9], [47, 19, -45, 18, 7], [-12, 35, -82, 30, 11], [30, 25, -38, 16, 6]];
+  for (const [x, y, z, sx, sy] of cloudSpots) {
+    const cloud = new THREE.Sprite(cloudMat.clone());
+    cloud.position.set(x, y, z);
+    cloud.scale.set(sx, sy, 1);
+    cloud.material.rotation = Math.random() * 0.25 - 0.12;
+    scene.add(cloud);
+  }
+  const sunTex = canvasTex(128, (g, S) => {
+    const rg = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+    rg.addColorStop(0, 'rgba(255,255,230,1)');
+    rg.addColorStop(0.2, 'rgba(255,246,190,.95)');
+    rg.addColorStop(0.55, 'rgba(255,224,140,.28)');
+    rg.addColorStop(1, 'rgba(255,224,140,0)');
+    g.fillStyle = rg; g.fillRect(0, 0, S, S);
+  });
+  const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, transparent: true, depthWrite: false, fog: false, opacity: 0.95 }));
+  sunSprite.position.set(-50, 40, -76);
+  sunSprite.scale.set(18, 18, 1);
+  scene.add(sunSprite);
+  scene.add(stars);
 }
 
 /* ================= 地面 ================= */
 {
   const ground = new THREE.Mesh(
     new THREE.CircleGeometry(46, 64),
-    new THREE.MeshStandardMaterial({ map: dirtTex, color: 0xb7a68a, roughness: 1, metalness: 0 })
+    new THREE.MeshStandardMaterial({ map: grassTex, color: 0x9fbd7c, roughness: 1, metalness: 0 })
   );
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
@@ -759,7 +810,7 @@ const lanternRig = { group: null, light: null };
   lamp.position.y = -0.62;
   const metalMat = new THREE.MeshStandardMaterial({ color: 0x39302a, roughness: 0.55, metalness: 0.7 });
   const glassMat = new THREE.MeshStandardMaterial({
-    color: 0xffc98a, emissive: 0xff9d43, emissiveIntensity: 1.7, roughness: 0.28,
+    color: 0xffc98a, emissive: 0xff9d43, emissiveIntensity: 0.06, roughness: 0.28,
     transparent: true, opacity: 0.94
   });
   const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.19, 12), glassMat);
@@ -776,7 +827,7 @@ const lanternRig = { group: null, light: null };
   lamp.add(flame);
   rig.add(lamp);
 
-  const lampLight = new THREE.PointLight(0xffbe86, 6.0, 9.5, 2);
+  const lampLight = new THREE.PointLight(0xffbe86, 0.0, 9.5, 2);
   lampLight.position.set(0, -0.6, 0);
   lampLight.castShadow = !IS_SMALL;
   if (lampLight.castShadow) {
@@ -794,7 +845,7 @@ const lanternRig = { group: null, light: null };
   /* 灯泡串 */
   const wireMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1 });
   const bulbMat = new THREE.MeshStandardMaterial({
-    color: 0xffd9a0, emissive: 0xffb75c, emissiveIntensity: 3.4, roughness: 0.4
+    color: 0xffd9a0, emissive: 0xffb75c, emissiveIntensity: 0.12, roughness: 0.4
   });
   const bulbGeo = new THREE.SphereGeometry(0.035, 8, 8);
   const strands = [
@@ -813,7 +864,7 @@ const lanternRig = { group: null, light: null };
       scene.add(bulb);
     }
   }
-  const fill = new THREE.PointLight(0xffc48a, 2.2, 14, 2);
+  const fill = new THREE.PointLight(0xffc48a, 0.18, 14, 2);
   fill.position.set(-1.0, 1.9, -2.0);
   scene.add(fill);
 }
@@ -916,6 +967,7 @@ const _v1 = new THREE.Vector3();
     s.position.set(Math.cos(a) * r, 0.2 + Math.random() * 1.0, Math.sin(a) * r);
     s.scale.setScalar(1.8 + Math.random() * 2.6);
     s.renderOrder = 2;
+    s.visible = false;
     s.userData = { base: s.position.clone(), ph: Math.random() * 6.283, sp: 0.04 + Math.random() * 0.07 };
     scene.add(s);
     hazeSprites.push(s);
@@ -938,6 +990,7 @@ const _v1 = new THREE.Vector3();
       })
     );
     cone.position.y = -0.87;
+    cone.visible = false;
     lanternRig.lamp.add(cone);
   }
 
@@ -946,6 +999,7 @@ const _v1 = new THREE.Vector3();
   const mothMat = new THREE.MeshBasicMaterial({ color: 0x3a3128 });
   for (let i = 0; i < 6; i++) {
     const m = new THREE.Mesh(mothGeo, mothMat);
+    m.visible = false;
     m.userData = { r: 0.18 + Math.random() * 0.3, ph: Math.random() * 6.283, sp: 1.4 + Math.random() * 1.6, y: Math.random() * 0.4 };
     scene.add(m);
     moths.push(m);
@@ -965,6 +1019,7 @@ const _v1 = new THREE.Vector3();
     color: 0xffd9a8, size: 0.012, transparent: true, opacity: 0.5, depthWrite: false,
     blending: THREE.AdditiveBlending
   }));
+  dustPoints.visible = false;
   scene.add(dustPoints);
 }
 /* ================= 动物 ================= */
@@ -1787,7 +1842,7 @@ function buildLeaderboard() {
     group.add(post);
   }
   /* 板子顶上的小灯：照亮木牌 */
-  const lamp = new THREE.PointLight(0xffc07a, 3.2, 6, 2);
+  const lamp = new THREE.PointLight(0xffc07a, 0.18, 6, 2);
   lamp.position.set(0, 1.6, 0.8);
   group.add(lamp);
 
@@ -1876,6 +1931,7 @@ const fireflies = [];
     const a = rng() * 6.283, r = 2 + rng() * 5;
     f.position.set(Math.cos(a) * r, 0.6 + rng() * 1.6, Math.sin(a) * r);
     f.userData = { base: f.position.clone(), sp: 0.2 + rng() * 0.5, ph: rng() * 6.283, amp: 0.3 + rng() * 0.7 };
+    f.visible = false;
     scene.add(f);
     fireflies.push(f);
   }
@@ -1887,14 +1943,14 @@ function updateAtmosphere(dt, now) {
     lanternRig.group.rotation.z = Math.sin(s * 0.62) * 0.055 + Math.sin(s * 1.7) * 0.012;
     lanternRig.group.rotation.x = Math.sin(s * 0.48 + 1.1) * 0.045;
     const flicker = 0.82 + Math.sin(s * 7.3) * 0.06 + Math.sin(s * 17.1) * 0.04 + Math.sin(s * 3.1) * 0.05;
-    lanternRig.light.intensity = 6.0 * flicker;
+    lanternRig.light.intensity = 0.0;
   }
   for (const f of fireflies) {
     const u = f.userData;
     f.position.y = u.base.y + Math.sin(s * u.sp * 2 + u.ph) * 0.35;
     f.position.x = u.base.x + Math.cos(s * u.sp + u.ph) * u.amp;
     f.position.z = u.base.z + Math.sin(s * u.sp * 0.8 + u.ph * 1.7) * u.amp;
-    f.visible = (Math.sin(s * 1.6 + u.ph * 2) + 1) > 0.35;
+    f.visible = false;
   }
 
   /* 蛾子绕灯、薄雾飘、浮尘慢慢往上 */
@@ -3416,7 +3472,7 @@ async function netStartGame() {
       ai: { bluff: 0.55, suspicion: 0.12 }
     };
   });
-  NET.mySeat = -1;
+  NET.mySeat = Math.max(0, G.players.findIndex(p => p.local));
   animals.forEach((a, i) => {
     a.bound = G.players[i] || null;
     a.group.visible = i !== NET.mySeat;
