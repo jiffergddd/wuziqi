@@ -1759,7 +1759,7 @@ function spawnSeats(seed) {
 
   SEATS.forEach((seat, i) => {
     const kind = chosen[i];
-    const a = buildPaperAnimal(kind);
+    const a = buildAnimal(kind, rng);
     a.group.position.copy(seat.pos);
     a.group.rotation.y = seat.rotY;
     a.kind = kind;
@@ -3121,8 +3121,8 @@ async function eliminate(p) {
     return;
   }
   await Promise.all([
-    tween(p.animal.group.rotation, { x: 0.12, z: 1.18 }, 0.65, easeInOut),
-    tween(p.animal.group.position, { y: 0.28 }, 0.65, easeInOut)
+    tween(p.animal.group.rotation, { x: 0.05, z: 1.08 }, 0.65, easeInOut),
+    tween(p.animal.group.position, { y: 0.38 }, 0.65, easeInOut)
   ]);
 }
 /* ---------- AI ---------- */
@@ -3870,9 +3870,9 @@ function applyNetState(st) {
       }
     } else {
       gp.animal.group.visible = p.pid !== NET.id;
-      gp.animal.group.rotation.x = 0.08;
-      gp.animal.group.rotation.z = gp.animal.paper ? 1.08 : 1.18;
-      gp.animal.group.position.y = 0.24;
+      gp.animal.group.rotation.x = 0.05;
+      gp.animal.group.rotation.z = gp.animal.paper ? 1.08 : 1.12;
+      gp.animal.group.position.y = 0.38;
       gp.animal.headUI.group.visible = false;
       if (gp.animal.paper) {
         gp.animal.paper.dead = true;
@@ -4151,7 +4151,7 @@ function submitEntry() {
 function spawnSpectatorAnimal() {
   const kind = pick(Math.random, ['cat', 'dog', 'pig', 'cow', 'goat']);
   const rng = mulberry((Math.random() * 1e6) | 0);
-  const a = buildPaperAnimal(kind);
+  const a = buildAnimal(kind, rng);
   const ang = Math.random() * 6.283;
   const r = 3.4 + Math.random() * 1.6;
   a.group.position.set(Math.cos(ang) * r, 0, Math.sin(ang) * r);
@@ -4236,7 +4236,7 @@ function upsertRemoteSpectator(msg) {
   let e = SPECT.others.get(msg.id);
   if (!e) {
     const rng = mulberry(String(msg.id).length * 977 + 13);
-    const a = buildPaperAnimal(msg.kind || 'cat');
+    const a = buildAnimal(msg.kind || 'cat', rng);
     a.group.position.set(x, 0, z);
     a.group.rotation.y = msg.ry || 0;
     a.kind = msg.kind || 'cat';
