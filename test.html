@@ -189,6 +189,10 @@
   .tpBtns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
   .tpBtns button{flex:1;min-width:92px;padding:14px 10px;border-radius:12px;border:1px solid rgba(255,179,92,.55);background:rgba(255,179,92,.16);color:#f4dfbd;font-weight:700;font-size:15px;cursor:pointer}
   .tpBtns button:active{transform:scale(.97)}
+  #challengeCount{position:fixed;left:50%;top:30%;transform:translate(-50%,-50%);z-index:6;color:#fff;
+    font-size:64px;font-weight:900;letter-spacing:.06em;opacity:0;pointer-events:none;
+    text-shadow:0 3px 0 rgba(0,0,0,.28),0 10px 28px rgba(0,0,0,.55);transition:opacity .15s}
+  #challengeCount.show{opacity:1}
 </style>
 </head>
 <body>
@@ -212,7 +216,7 @@
   <button id="btnChallenge" class="ghost" disabled>质疑</button>
   <button id="btnPenalty" class="ghost" disabled style="display:none">认罚</button>
 </div>
-<div class="banner" id="banner"></div>
+<div class="banner" id="banner"></div><div id="challengeCount"></div>
 <div id="pulse"></div>
 <button id="btnHelp" class="helpBtn">?</button>
 <div class="help" id="help">
@@ -1570,6 +1574,158 @@ function buildAnimal(kind, rng) {
 }
 
 /* ================= 座位 ================= */
+/* ================= 动物纸片人 ================= */
+const PAPER_PAL = {
+  cat:  { fur: '#b9b2a7', shade: '#8e8578', cloth: '#66805a', inner: '#f0c9c1' },
+  dog:  { fur: '#d3a36a', shade: '#9b6b3a', cloth: '#7a5b3a', inner: '#e8b9a4' },
+  pig:  { fur: '#f1b6b8', shade: '#cf8b90', cloth: '#8d6a4e', inner: '#f7d3d5' },
+  cow:  { fur: '#f2e8d8', shade: '#2d2925', cloth: '#6b7c5a', inner: '#f3c6be' },
+  goat: { fur: '#e8dfc5', shade: '#b1a07b', cloth: '#7d6a52', inner: '#e8c8b7' }
+};
+const paperTexCache = new Map();
+
+function paperOutline(g, draw, fill) {
+  g.beginPath(); draw(g);
+  g.lineJoin = 'round'; g.lineWidth = 13; g.strokeStyle = '#fffdf4'; g.stroke();
+  g.fillStyle = fill; g.fill();
+}
+
+function buildPaperTextures(kind) {
+  if (paperTexCache.has(kind)) return paperTexCache.get(kind);
+  const pal = PAPER_PAL[kind] || PAPER_PAL.cat;
+  const body = canvasTexWH(256, 512, (g) => {
+    g.clearRect(0, 0, 256, 512);
+    /* 腿 */
+    paperOutline(g, x => x.roundRect(70, 370, 46, 130, 20), pal.shade);
+    paperOutline(g, x => x.roundRect(140, 370, 46, 130, 20), pal.shade);
+    /* 鞋 */
+    paperOutline(g, x => x.roundRect(60, 490, 64, 30, 14), '#4a3a2a');
+    paperOutline(g, x => x.roundRect(132, 490, 64, 30, 14), '#4a3a2a');
+    /* 身体 */
+    paperOutline(g, x => x.roundRect(56, 90, 144, 330, 56), pal.fur);
+    /* 背带裤 */
+    paperOutline(g, x => x.roundRect(72, 152, 112, 230, 28), pal.cloth);
+    g.strokeStyle = pal.cloth; g.lineWidth = 10;
+    g.beginPath(); g.moveTo(86, 154); g.lineTo(96, 108); g.stroke();
+    g.beginPath(); g.moveTo(170, 154); g.lineTo(160, 108); g.stroke();
+    g.fillStyle = '#e8c36a';
+    g.beginPath(); g.arc(94, 166, 6, 0, 6.283); g.fill();
+    g.beginPath(); g.arc(162, 166, 6, 0, 6.283); g.fill();
+    /* 手臂 */
+    paperOutline(g, x => x.roundRect(24, 116, 38, 226, 18), pal.fur);
+    paperOutline(g, x => x.roundRect(194, 116, 38, 226, 18), pal.fur);
+    paperOutline(g, x => { x.arc(43, 352, 21, 0, 6.283); }, pal.inner);
+    paperOutline(g, x => { x.arc(213, 352, 21, 0, 6.283); }, pal.inner);
+    /* 尾巴 */
+    g.strokeStyle = pal.shade; g.lineWidth = 12; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(196, 350); g.quadraticCurveTo(238, 330, 224, 286); g.stroke();
+    /* 高光/纸纹 */
+    g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 4;
+    g.beginPath(); g.moveTo(74, 122); g.lineTo(74, 330); g.stroke();
+  });
+  const head = canvasTexWH(256, 256, (g) => {
+    g.clearRect(0, 0, 256, 256);
+    /* 耳朵/角 */
+    if (kind === 'cat') {
+      paperOutline(g, x => { x.moveTo(54, 92); x.lineTo(72, 30); x.lineTo(110, 68); x.closePath(); }, pal.fur);
+      paperOutline(g, x => { x.moveTo(202, 92); x.lineTo(184, 30); x.lineTo(146, 68); x.closePath(); }, pal.fur);
+    } else if (kind === 'dog') {
+      paperOutline(g, x => { x.ellipse(48, 105, 30, 56, -0.35, 0, 6.283); }, pal.shade);
+      paperOutline(g, x => { x.ellipse(208, 105, 30, 56, 0.35, 0, 6.283); }, pal.shade);
+    } else if (kind === 'pig') {
+      paperOutline(g, x => { x.moveTo(56, 92); x.lineTo(66, 36); x.lineTo(106, 74); x.closePath(); }, pal.fur);
+      paperOutline(g, x => { x.moveTo(200, 92); x.lineTo(190, 36); x.lineTo(150, 74); x.closePath(); }, pal.fur);
+    } else if (kind === 'cow') {
+      paperOutline(g, x => { x.ellipse(62, 74, 13, 35, -0.5, 0, 6.283); }, '#f4e6c8');
+      paperOutline(g, x => { x.ellipse(194, 74, 13, 35, 0.5, 0, 6.283); }, '#f4e6c8');
+    } else if (kind === 'goat') {
+      g.strokeStyle = '#8b7654'; g.lineWidth = 10; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(84, 78); g.quadraticCurveTo(60, 22, 28, 34); g.stroke();
+      g.beginPath(); g.moveTo(172, 78); g.quadraticCurveTo(196, 22, 228, 34); g.stroke();
+      paperOutline(g, x => { x.ellipse(48, 118, 22, 40, -0.25, 0, 6.283); }, pal.fur);
+      paperOutline(g, x => { x.ellipse(208, 118, 22, 40, 0.25, 0, 6.283); }, pal.fur);
+    }
+    /* 脸 */
+    paperOutline(g, x => x.ellipse(128, 132, 84, 82, 0, 0, 6.283), pal.fur);
+    if (kind === 'cow') {
+      paperOutline(g, x => x.ellipse(82, 100, 26, 34, -0.3, 0, 6.283), pal.shade);
+      paperOutline(g, x => x.ellipse(170, 170, 20, 24, 0.4, 0, 6.283), pal.shade);
+    }
+    /* 口鼻 */
+    paperOutline(g, x => x.ellipse(128, 162, 46, 32, 0, 0, 6.283), pal.inner);
+    if (kind === 'pig') {
+      paperOutline(g, x => x.ellipse(128, 156, 34, 23, 0, 0, 6.283), '#e99a9f');
+      g.fillStyle = '#a9555c';
+      g.beginPath(); g.ellipse(117, 155, 4, 7, 0, 0, 6.283); g.fill();
+      g.beginPath(); g.ellipse(139, 155, 4, 7, 0, 0, 6.283); g.fill();
+    } else {
+      g.fillStyle = '#3a2820';
+      g.beginPath(); g.ellipse(128, 150, 10, 7, 0, 0, 6.283); g.fill();
+      g.strokeStyle = '#3a2820'; g.lineWidth = 4; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(128, 157); g.lineTo(128, 168); g.stroke();
+      g.beginPath(); g.moveTo(128, 168); g.quadraticCurveTo(116, 176, 108, 168); g.stroke();
+      g.beginPath(); g.moveTo(128, 168); g.quadraticCurveTo(140, 176, 148, 168); g.stroke();
+    }
+    /* 眼睛 */
+    for (const ex of [96, 160]) {
+      g.fillStyle = '#2b2420';
+      g.beginPath(); g.ellipse(ex, 112, 8, 11, 0, 0, 6.283); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.9)';
+      g.beginPath(); g.arc(ex - 3, 108, 3, 0, 6.283); g.fill();
+    }
+    /* 腮红 */
+    g.fillStyle = 'rgba(226,130,120,.35)';
+    g.beginPath(); g.ellipse(72, 150, 14, 8, 0, 0, 6.283); g.fill();
+    g.beginPath(); g.ellipse(184, 150, 14, 8, 0, 0, 6.283); g.fill();
+    if (kind === 'goat') {
+      g.fillStyle = pal.shade;
+      g.beginPath(); g.ellipse(128, 205, 13, 25, 0, 0, 6.283); g.fill();
+    }
+    /* 猫胡须 */
+    if (kind === 'cat') {
+      g.strokeStyle = 'rgba(80,70,60,.6)'; g.lineWidth = 3;
+      for (const s of [-1, 1]) {
+        g.beginPath(); g.moveTo(128 + s * 40, 158); g.lineTo(128 + s * 76, 150); g.stroke();
+        g.beginPath(); g.moveTo(128 + s * 40, 168); g.lineTo(128 + s * 76, 170); g.stroke();
+      }
+    }
+  });
+  const result = { body, head };
+  paperTexCache.set(kind, result);
+  return result;
+}
+
+function buildPaperAnimal(kind) {
+  const group = new THREE.Group();
+  const tex = buildPaperTextures(kind);
+  const bodyMat = new THREE.MeshBasicMaterial({ map: tex.body, transparent: true, alphaTest: 0.04, side: THREE.DoubleSide, toneMapped: false });
+  const headMat = new THREE.MeshBasicMaterial({ map: tex.head, transparent: true, alphaTest: 0.04, side: THREE.DoubleSide, toneMapped: false });
+  const visual = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.PlaneGeometry(0.58, 1.08), bodyMat);
+  body.position.y = 0.54;
+  visual.add(body);
+  const headPivot = new THREE.Group();
+  headPivot.position.y = 0.68;
+  const head = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), headMat);
+  head.position.y = 0.25;
+  headPivot.add(head);
+  visual.add(headPivot);
+  group.add(visual);
+  const shadow = new THREE.Mesh(
+    new THREE.CircleGeometry(0.3, 24),
+    new THREE.MeshBasicMaterial({ color: 0x1a2a16, transparent: true, opacity: 0.22, depthWrite: false })
+  );
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = 0.006;
+  group.add(shadow);
+  const a = {
+    group, kind, paper: { visual, body, headPivot, head, shadow, dead: false },
+    headY: 1.06, t: 0, phase: Math.random() * 6.283, idleSpeed: 1,
+    eyes: [], ears: [], torso: body, head: headPivot, tailPivot: new THREE.Object3D()
+  };
+  group.userData.paper = a.paper;
+  return a;
+}
 const SEATS = [
   { key: 'S', pos: new THREE.Vector3(0, SEAT_Y, 1.02), rotY: Math.PI, label: '你' },
   { key: 'W', pos: new THREE.Vector3(-1.30, SEAT_Y, -0.04), rotY: Math.PI / 2, label: '左手边' },
@@ -1603,7 +1759,7 @@ function spawnSeats(seed) {
 
   SEATS.forEach((seat, i) => {
     const kind = chosen[i];
-    const a = buildAnimal(kind, rng);
+    const a = buildPaperAnimal(kind);
     a.group.position.copy(seat.pos);
     a.group.rotation.y = seat.rotY;
     a.kind = kind;
@@ -1875,6 +2031,14 @@ function renderRoster() {
 function idleAnimals(dt, now) {
   for (const a of animals) {
     a.t += dt;
+    if (a.paper) {
+      if (!a.paper.dead) {
+        const pt = a.t * a.idleSpeed + a.phase;
+        a.paper.visual.position.y = Math.sin(pt * 1.5) * 0.012;
+        a.paper.headPivot.rotation.z = Math.sin(pt * 0.7) * 0.035;
+      }
+      continue;
+    }
     const t = a.t * a.idleSpeed + a.phase;
 
     /* 呼吸 */
@@ -2321,6 +2485,7 @@ function updateTweens(dt) {
   }
 }
 const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeIn = x => x * x;
 const easeInOut = x => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2337,6 +2502,7 @@ const G = {
   main: 0,
   winner: null,
   challenge: null,
+  challengeEnd: 0,
   lastClaim: null,
   round: 0,
   phase: 'boot',
@@ -2345,7 +2511,7 @@ const G = {
   humanResolve: null
 };
 const T = ms => SIM ? Promise.resolve() : sleep(FAST ? 1 : (G.auto ? Math.min(120, ms * 0.12) : ms));
-const CHALLENGE_MS = 2200;
+const CHALLENGE_MS = 4000;
 
 const handGroup = new THREE.Group();
 handGroup.position.set(0, -0.185, -0.78);
@@ -2552,6 +2718,14 @@ async function dealInitial() {
   G.players.forEach(p => {
     p.hand = p.alive ? deck.splice(0, 5) : [];
     p.drunk = 0;
+    if (p.animal.paper) {
+      p.animal.paper.dead = false;
+      p.animal.paper.headPivot.rotation.set(0, 0, 0);
+      p.animal.paper.visual.position.y = 0;
+      p.animal.group.rotation.x = 0;
+      p.animal.group.rotation.z = 0;
+      p.animal.group.position.y = 0.44;
+    }
     if (p.cardsGroup) p.cardsGroup.visible = true;
     if (p.animal.headUI) {
       p.animal.headUI.hp = 100;
@@ -2664,6 +2838,7 @@ function openChallengeWindow(claim, claimer) {
   return new Promise(resolve => {
     const c = { claim, claimerIdx: claimer.idx, until: Date.now() + CHALLENGE_MS, resolve };
     G.challenge = c;
+    G.challengeEnd = c.until;
     G.phase = 'challenge';
     updatePlayButton();
     setClaim('「' + claimer.name + '」出了 ' + claim.count + ' 张，抢质疑！');
@@ -2677,6 +2852,7 @@ function finishChallengeWindow(challenger) {
   const c = G.challenge;
   if (!c) return;
   G.challenge = null;
+  G.challengeEnd = 0;
   clearTimeout(c.timer);
   G.phase = 'turn';
   updatePlayButton();
@@ -2691,11 +2867,50 @@ function submitChallenge(pid) {
   finishChallengeWindow(p);
 }
 
+function drinkAnimation(p) {
+  const a = p && p.animal;
+  if (!a || !a.group) return Promise.resolve();
+  const base = a.group.position.clone();
+  const dir = new THREE.Vector3(-base.x, 0, -base.z);
+  if (dir.lengthSq() < 0.0001) dir.set(0, 0, 1);
+  dir.normalize();
+  const bottle = new THREE.Group();
+  const glass = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.022, 0.032, 0.12, 10),
+    new THREE.MeshStandardMaterial({ color: 0x6f4a2a, roughness: 0.45, metalness: 0.15 })
+  );
+  glass.castShadow = true;
+  bottle.add(glass);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.018, 0.05, 8), glass.material);
+  neck.position.y = 0.082;
+  bottle.add(neck);
+  bottle.position.copy(base).add(new THREE.Vector3(0, 0.78, 0)).addScaledVector(dir, 0.28);
+  scene.add(bottle);
+  const target = base.clone().add(new THREE.Vector3(0, (a.headY || 1.0) + 0.08, 0)).addScaledVector(dir, 0.1);
+  return (async () => {
+    await Promise.all([
+      tween(bottle.position, { x: target.x, y: target.y, z: target.z }, 0.3, easeOut),
+      a.paper ? tween(a.paper.headPivot.rotation, { x: -0.55 }, 0.3, easeInOut) : tween(a.group.rotation, { x: -0.16 }, 0.3, easeInOut)
+    ]);
+    await tween(bottle.rotation, { z: -1.25 }, 0.25, easeInOut);
+    Audio2.click();
+    await T(350);
+    await Promise.all([
+      a.paper ? tween(a.paper.headPivot.rotation, { x: 0 }, 0.25, easeInOut) : tween(a.group.rotation, { x: 0 }, 0.25, easeInOut),
+      tween(bottle.position, { y: bottle.position.y - 0.3 }, 0.25, easeIn)
+    ]);
+    scene.remove(bottle);
+  })();
+}
 async function drinkMany(list, pileCount) {
   const drinkers = list.filter(p => p.alive);
   if (!drinkers.length) return;
   showBanner(drinkers.map(p => '「' + p.name + '」').join('、') + ' 喝酒…', 1000);
-  await T(350);
+  if (NET.on && NetHostFlag()) {
+    try { NET.client.publish(T_ACT(), JSON.stringify({ t: 'act', type: 'drink', pids: drinkers.map(p => p.pid) }), { qos: 1 }); } catch (e) {}
+  }
+  await Promise.all(drinkers.map(p => drinkAnimation(p)));
+  await T(150);
   const out = [];
   for (const p of drinkers) {
     const chance = Math.min(0.85, (p.drunk || 0) / 100 * 0.45 + pileCount * 0.035);
@@ -2732,6 +2947,11 @@ function startNewRound(mainIdx) {
       p.animal.group.rotation.z = 0;
       p.animal.group.position.y = 0.44;
       p.animal.group.visible = !p.local;
+      if (p.animal.paper) {
+        p.animal.paper.dead = false;
+        p.animal.paper.headPivot.rotation.set(0, 0, 0);
+        p.animal.paper.visual.position.y = 0;
+      }
       if (p.cardsGroup) p.cardsGroup.visible = true;
       if (p.animal.headUI) {
         p.animal.headUI.hp = 100 - (p.drunk || 0);
@@ -2759,7 +2979,7 @@ async function flyCardsToPile(p, cards, fromMeshes) {
       mesh.updateWorldMatrix(true, false);
       scene.attach(mesh);
     } else {
-      mesh = cardMesh(card.rank, false);
+      mesh = cardMesh(card.rank, true);
       const src = p.cardsGroup ? p.cardsGroup.getWorldPosition(new THREE.Vector3()) : p.animal.group.position.clone().add(new THREE.Vector3(0, 0.9, 0));
       mesh.position.copy(src);
       scene.add(mesh);
@@ -2767,7 +2987,7 @@ async function flyCardsToPile(p, cards, fromMeshes) {
     mesh.rotation.set(0, Math.random() * 0.4 - 0.2, 0);
     const dest = pileBase.clone().add(new THREE.Vector3((i - 1) * 0.035, 0.004 + i * 0.004, (i - 1) * 0.02));
     return tween(mesh.position, { x: dest.x, y: dest.y, z: dest.z }, 0.18, easeOut).then(() => {
-      G.pile.push({ card, mesh });
+      G.pile.push({ card, mesh, by: p.idx });
     });
   });
   await Promise.all(jobs);
@@ -2891,6 +3111,15 @@ async function eliminate(p) {
   if (p.animal.headUI) p.animal.headUI.group.visible = false;
   p.animal.group.visible = !p.local;
   Audio2.lose();
+  if (p.animal.paper) {
+    p.animal.paper.dead = true;
+    await Promise.all([
+      tween(p.animal.paper.headPivot.rotation, { x: -1.45 }, 0.6, easeInOut),
+      tween(p.animal.group.rotation, { z: 1.08 }, 0.65, easeInOut),
+      tween(p.animal.group.position, { y: 0.24 }, 0.65, easeInOut)
+    ]);
+    return;
+  }
   await Promise.all([
     tween(p.animal.group.rotation, { x: 0.12, z: 1.18 }, 0.65, easeInOut),
     tween(p.animal.group.position, { y: 0.28 }, 0.65, easeInOut)
@@ -3227,6 +3456,11 @@ async function newGame(localName) {
     if (!p.animal.group) return;
     p.animal.group.rotation.set(0, p.animal.group.rotation.y, 0);
     p.animal.group.position.y = 0.44;
+      if (p.animal.paper) {
+        p.animal.paper.dead = false;
+        p.animal.paper.headPivot.rotation.set(0, 0, 0);
+        p.animal.paper.visual.position.y = 0;
+      }
     p.animal.group.visible = !p.human;
     if (p.cardsGroup) { p.cardsGroup.visible = true; }
     if (p.animal.headUI) { p.animal.headUI.hp = 100; p.animal.headUI.group.visible = true; refreshHp(p.animal); }
@@ -3532,6 +3766,14 @@ async function netStartGame() {
   NET.mySeat = Math.max(0, G.players.findIndex(p => p.local));
   animals.forEach((a, i) => {
     a.bound = G.players[i] || null;
+      if (a.paper) {
+        a.paper.dead = false;
+        a.paper.headPivot.rotation.set(0, 0, 0);
+        a.paper.visual.position.y = 0;
+        a.group.rotation.x = 0;
+        a.group.rotation.z = 0;
+        a.group.position.y = 0.44;
+      }
     a.group.visible = i !== NET.mySeat;
     if (a.headUI) a.headUI.group.visible = i !== NET.mySeat;
     if (G.players[i]) setAnimalName(a, G.players[i].name);
@@ -3558,7 +3800,9 @@ function netPublishState(phase) {
     turn: G.players[G.turn] ? G.players[G.turn].pid : null,
     over: G.over, winner: winner ? winner.pid : null,
     claim: G.lastClaim ? { by: G.players[G.lastClaim.by].pid, count: G.lastClaim.count } : null,
+    challengeMs: G.challenge ? Math.max(0, G.challenge.until - Date.now()) : 0,
     pile: G.pile.length,
+    pileCards: G.pile.map(e => ({ rank: e.card.rank, by: e.by })),
     players: G.players.map(p => ({
       pid: p.pid, name: p.name, seat: (typeof p.seatIdx === 'number' ? p.seatIdx : p.idx), alive: p.alive,
       drunk: Math.round(p.drunk || 0),
@@ -3619,19 +3863,28 @@ function applyNetState(st) {
       gp.animal.group.position.y = 0.44;
       gp.animal.group.visible = p.pid !== NET.id;
       gp.animal.headUI.group.visible = p.pid !== NET.id;
+      if (gp.animal.paper) {
+        gp.animal.paper.dead = false;
+        gp.animal.paper.headPivot.rotation.set(0, 0, 0);
+        gp.animal.paper.visual.position.y = 0;
+      }
     } else {
       gp.animal.group.visible = p.pid !== NET.id;
-      gp.animal.group.rotation.x = 0.12;
-      gp.animal.group.rotation.z = 1.18;
-      gp.animal.group.position.y = 0.28;
+      gp.animal.group.rotation.x = 0.08;
+      gp.animal.group.rotation.z = gp.animal.paper ? 1.08 : 1.18;
+      gp.animal.group.position.y = 0.24;
       gp.animal.headUI.group.visible = false;
+      if (gp.animal.paper) {
+        gp.animal.paper.dead = true;
+        gp.animal.paper.headPivot.rotation.x = -1.45;
+      }
     }
     refreshHp(gp.animal);
   });
   G.turn = Math.max(0, st.players.findIndex(p => p.pid === st.turn));
   G.main = Math.max(0, st.players.findIndex(p => p.pid === st.main));
   G.lastClaim = st.claim ? { by: st.players.findIndex(p => p.pid === st.claim.by), count: st.claim.count } : null;
-  syncNetPile(st.pile || 0);
+  syncNetPile(st.pile || 0, st.pileCards || []);
   updateHUD();
   const me = G.players.find(p => p.local);
   if (me) setRivalCardsCounts();
@@ -3643,6 +3896,7 @@ function applyNetState(st) {
   }
   if (st.phase === 'challenge') {
     G.challenge = st.claim ? { claimerIdx: G.lastClaim ? G.lastClaim.by : -1, until: 0 } : null;
+    G.challengeEnd = Date.now() + (st.challengeMs || 0);
     G.phase = 'challenge';
     updatePlayButton();
     closeTargetPick();
@@ -3652,13 +3906,16 @@ function applyNetState(st) {
   }
   if (st.phase === 'resolve') {
     G.challenge = null;
+    G.challengeEnd = 0;
     G.phase = 'resolve';
     updatePlayButton();
     closeTargetPick();
     setClaim('');
     return;
   }
-  G.challenge = null;  if (st.round !== NET.lastRound) { NET.lastRound = st.round; NET.lastTurnPid = ''; }
+  G.challenge = null;
+  G.challengeEnd = 0;
+  if (st.round !== NET.lastRound) { NET.lastRound = st.round; NET.lastTurnPid = ''; }
   const isMyTurn = st.turn === NET.id;
   if (st.phase === 'choose') {
     G.phase = 'choose';
@@ -3716,7 +3973,17 @@ function netSend(action) {
 }
 
 function netOnAct(msg) {
-  if (!msg || msg.t !== 'act' || !NetHostFlag()) return;
+  if (!msg || msg.t !== 'act') return;
+  if (msg.type === 'drink') {
+    if (!NetHostFlag()) {
+      for (const pid of (msg.pids || [])) {
+        const p = G.players.find(x => x.pid === pid);
+        if (p) drinkAnimation(p);
+      }
+    }
+    return;
+  }
+  if (!NetHostFlag()) return;
   if (G.challenge && msg.type === 'challenge') { submitChallenge(msg.pid); return; }
   if (!NET.pending || NET.pending.pid !== msg.pid) return;
   const p = G.players.find(x => x.pid === msg.pid);
@@ -3771,18 +4038,22 @@ function applyCamSeat(seatIdx) {
 
 /* ---------- 客户端的牌堆 ---------- */
 const netPile = [];
-function syncNetPile(n) {
-  while (netPile.length > n) { const m = netPile.pop(); scene.remove(m); }
-  while (netPile.length < n) {
-    const i = netPile.length;
-    const m = cardMesh('wheat', false);
+let netPileSig = '';
+function syncNetPile(n, cards) {
+  cards = Array.isArray(cards) ? cards : [];
+  const sig = cards.map(c => c.rank + ':' + c.by).join('|');
+  if (sig === netPileSig && netPile.length === n) return;
+  while (netPile.length) { const m = netPile.pop(); scene.remove(m); }
+  for (let i = 0; i < cards.length; i++) {
+    const c = cards[i];
+    const m = cardMesh(c.rank || 'wheat', true);
     m.position.copy(PILE_POS).add(new THREE.Vector3((i % 3 - 1) * 0.02, i * 0.004, (i % 2) * 0.01));
-    m.rotation.y = Math.random() * 0.4 - 0.2;
+    m.rotation.y = Math.random() * 0.25 - 0.125;
     scene.add(m);
     netPile.push(m);
   }
+  netPileSig = sig;
 }
-
 /* ---------- 头顶改名 ---------- */
 function setAnimalName(a, name) {
   if (a._shownName === name) return;
@@ -3880,7 +4151,7 @@ function submitEntry() {
 function spawnSpectatorAnimal() {
   const kind = pick(Math.random, ['cat', 'dog', 'pig', 'cow', 'goat']);
   const rng = mulberry((Math.random() * 1e6) | 0);
-  const a = buildAnimal(kind, rng);
+  const a = buildPaperAnimal(kind);
   const ang = Math.random() * 6.283;
   const r = 3.4 + Math.random() * 1.6;
   a.group.position.set(Math.cos(ang) * r, 0, Math.sin(ang) * r);
@@ -3965,7 +4236,7 @@ function upsertRemoteSpectator(msg) {
   let e = SPECT.others.get(msg.id);
   if (!e) {
     const rng = mulberry(String(msg.id).length * 977 + 13);
-    const a = buildAnimal(msg.kind || 'cat', rng);
+    const a = buildPaperAnimal(msg.kind || 'cat');
     a.group.position.set(x, 0, z);
     a.group.rotation.y = msg.ry || 0;
     a.kind = msg.kind || 'cat';
@@ -4286,10 +4557,31 @@ else {
 let last = performance.now();
 let booted = false;
 
+function updateChallengeCountdown(now) {
+  const el = document.getElementById('challengeCount');
+  if (!el) return;
+  if (G.phase === 'challenge' && G.challengeEnd) {
+    const left = Math.max(0, G.challengeEnd - Date.now());
+    el.textContent = Math.max(1, Math.ceil(left / 1000));
+    el.classList.add('show');
+  } else {
+    el.classList.remove('show');
+  }
+}
+const _paperQ = new THREE.Quaternion();
+function updatePaperBillboards() {
+  for (const a of animals) {
+    if (!a.paper || a.paper.dead) continue;
+    a.group.getWorldQuaternion(_paperQ);
+    _paperQ.invert().multiply(camera.quaternion);
+    a.paper.visual.quaternion.copy(_paperQ);
+  }
+}
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000) * timeScale;
   last = now;
   updateTweens(dt);
+  updateChallengeCountdown(now);
   idleAnimals(dt, now);
   if (SPECT.on) spectatorMove(dt);
   updateSpectators(dt);
@@ -4298,6 +4590,7 @@ function frame(now) {
   updateHeadUI();
   updateAtmosphere(dt, now);
   updateCamera(dt, now);
+  updatePaperBillboards();
   renderer.render(scene, camera);
   if (!booted) {
     booted = true;
